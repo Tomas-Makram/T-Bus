@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>إعدادات الحساب - UBus</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+      align-items: start;
+    }
+
+    .settings-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .settings-card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg);
+    }
+
+    .settings-card-header .icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .settings-card-header h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .settings-card-header p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 2px 0 0;
+    }
+
+    .settings-card-body { padding: 20px; }
+
+    .field-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+    }
+    .field-row:last-child { border-bottom: none; }
+
+    .field-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+      flex-shrink: 0;
+      min-width: 100px;
+    }
+
+    .field-value {
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+      flex: 1;
+      text-align: left;
+    }
+
+    .strength-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .strength-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.3s, background 0.3s;
+    }
+    .strength-text {
+      font-size: 11px;
+      margin-top: 3px;
+    }
+
+    .avatar-circle {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; font-weight: 700;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+  <div id="sidebarMount"></div>
+
+  <div class="main-wrapper">
+    <header class="header">
+      <div class="header-title">⚙️ إعدادات الحساب</div>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-icon" title="تغيير المظهر"></button>
+      </div>
+    </header>
+
+    <main class="page-content">
+
+      <!-- Profile summary -->
+      <div id="profileSummary" style="margin-bottom:24px">
+        <div class="loader"><div class="spinner"></div></div>
+      </div>
+
+      <!-- Settings cards -->
+      <div class="settings-grid" id="settingsGrid">
+        <div class="loader"><div class="spinner"></div></div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="../js/app.js"></script>
+  <script>
+    if (!requireAuth()) throw '';
+
+    let currentUser  = null;
+    let currentRole  = null;
+
+    function getLastLoginValue(u) {
+      return u.lastLoginAt || u.lastLogin || u.LastLoginAt || u.LastLogin || null;
+    }
+
+    function fmtLastLogin(u) {
+      const v = getLastLoginValue(u);
+      return v ? fmtDateTime(v) : 'لم يسجل دخول بعد';
+    }
+
+    /* ══════ INIT ══════ */
+    async function init() {
+      currentRole = await resolveRole();
+      if (!currentRole) { window.location.href = '/pages/login.html'; return; }
+
+      document.getElementById('sidebarMount').innerHTML = buildSidebar('profile-settings');
+
+      const user = Auth.getUser();
+      const res  = await api.get(`/authenticate/my-account/${user.id}`);
+
+      if (!res?.success) {
+        toast('فشل تحميل بيانات الحساب', 'error');
+        return;
+      }
+
+      currentUser = res.data;
+
+      // حدّث الاسم في الـ sidebar
+      const me = Auth.getUser();
+      me.fullName = currentUser.fullName;
+      me.name     = currentUser.fullName;
+      localStorage.setItem('tbus_user', JSON.stringify(me));
+
+      renderProfileSummary();
+      renderSettingsCards();
+    }
+
+    /* ══════ PROFILE SUMMARY ══════ */
+    function renderProfileSummary() {
+      const u    = currentUser;
+      const role = currentRole;
+      const rBadge = role === 'Admin' ? 'badge-purple' : 'badge-info';
+      const rLabel = role === 'Admin' ? '👑 مدير النظام' : '🚗 سائق';
+
+      document.getElementById('profileSummary').innerHTML = `
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+            <div class="avatar-circle">${(u.fullName || 'U')[0].toUpperCase()}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:20px;font-weight:700">${u.fullName}</div>
+              <div style="font-size:14px;color:var(--text-muted);margin-top:3px">@${u.userName}</div>
+              <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <span class="badge ${rBadge}">${rLabel}</span>
+                <span class="badge ${u.blocked ? 'badge-danger' : 'badge-success'}">
+                  ${u.blocked ? '🚫 محظور' : '✓ نشط'}
+                </span>
+                <span style="font-size:12px;color:var(--text-muted)">
+                  تاريخ الإنشاء: ${fmtDate(u.createdAt)}
+                </span>
+                <span style="font-size:12px;color:var(--text-muted)">
+                  آخر تسجيل دخول: ${fmtLastLogin(u)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Current info fields (read-only display) -->
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+              <div>
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">آخر تسجيل دخول</div>
+                <div style="font-size:14px;font-weight:600">${fmtLastLogin(u)}</div>
+              </div>
+              ${u.phoneNumber ? `
+                <div>
+                  <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">رقم الهاتف</div>
+                  <div style="font-size:14px;font-weight:600">${u.phoneNumber}</div>
+                </div>` : ''}
+              ${u.nationalId ? `
+                <div>
+                  <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">الرقم القومي</div>
+                  <div style="font-size:14px;font-weight:600;font-family:monospace">${u.nationalId}</div>
+                </div>` : ''}
+              ${u.driverId ? `
+                <div>
+                  <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">مرتبط بسائق</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--text-muted);word-break:break-all">${u.driverId}</div>
+                </div>` : ''}
+            </div>
+          </div>
+        </div>`;
+    }
+
+    /* ══════ SETTINGS CARDS ══════ */
+    function renderSettingsCards() {
+      let html = '';
+
+      // ── كارت كلمة المرور — للجميع ──
+      html += `
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <div class="icon" style="background:var(--primary-light);color:var(--primary)">🔑</div>
+            <div>
+              <h3>تغيير كلمة المرور</h3>
+              <p>يُنصح بتغيير كلمة المرور بانتظام</p>
+            </div>
+          </div>
+          <div class="settings-card-body">
+            <div class="form-group" style="margin-bottom:14px">
+              <label>كلمة المرور الحالية</label>
+              <input type="password" id="cpOld" placeholder="أدخل كلمة المرور الحالية"
+                     autocomplete="current-password">
+            </div>
+            <div class="form-group" style="margin-bottom:8px">
+              <label>كلمة المرور الجديدة</label>
+              <input type="password" id="cpNew" placeholder="أدخل كلمة المرور الجديدة"
+                     autocomplete="new-password" oninput="checkStrength(this.value)">
+              <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+              <div class="strength-text" id="strengthText"></div>
+            </div>
+            <div class="form-group" style="margin-bottom:18px">
+              <label>تأكيد كلمة المرور</label>
+              <input type="password" id="cpConfirm" placeholder="أعد كتابة كلمة المرور الجديدة"
+                     autocomplete="new-password">
+            </div>
+            <button class="btn btn-primary w-full" style="justify-content:center"
+                    onclick="savePassword()">
+              🔑 حفظ كلمة المرور
+            </button>
+          </div>
+        </div>`;
+
+      // ── كارت تعديل البيانات — Admin فقط ──
+      if (currentRole === 'Admin') {
+        html += `
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="icon" style="background:var(--info-light);color:var(--info)">✏️</div>
+              <div>
+                <h3>تعديل بيانات الحساب</h3>
+                <p>تغيير الاسم والرقم القومي ورقم الهاتف</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="form-group" style="margin-bottom:14px">
+                <label>الاسم الكامل</label>
+                <input type="text" id="pfFullName"
+                       value="${currentUser.fullName || ''}"
+                       placeholder="الاسم الكامل">
+              </div>
+              <div class="form-group" style="margin-bottom:14px">
+                <label>رقم الهاتف</label>
+                <input type="tel" id="pfPhone"
+                       value="${currentUser.phoneNumber || ''}"
+                       placeholder="01xxxxxxxxx">
+              </div>
+              <div class="form-group" style="margin-bottom:18px">
+                <label>الرقم القومي</label>
+                <input type="text" id="pfNationalId"
+                       value="${currentUser.nationalId || ''}"
+                       placeholder="14 رقم" maxlength="14">
+              </div>
+              <button class="btn btn-primary w-full" style="justify-content:center"
+                      onclick="saveProfile()">
+                💾 حفظ التعديلات
+              </button>
+            </div>
+          </div>`;
+      }
+
+      document.getElementById('settingsGrid').innerHTML = html;
+    }
+
+    /* ══════ PASSWORD STRENGTH ══════ */
+    function checkStrength(val) {
+      const fill = document.getElementById('strengthFill');
+      const text = document.getElementById('strengthText');
+      if (!val) { fill.style.width = '0'; text.textContent = ''; return; }
+
+      let score = 0;
+      if (val.length >= 8)  score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+
+      const levels = [
+        { w: '25%',  bg: '#ef4444', label: 'ضعيفة جداً' },
+        { w: '50%',  bg: '#f97316', label: 'ضعيفة' },
+        { w: '75%',  bg: '#eab308', label: 'متوسطة' },
+        { w: '100%', bg: '#22c55e', label: 'قوية' },
+      ];
+
+      const lvl = levels[score - 1] || levels[0];
+      fill.style.width      = lvl.w;
+      fill.style.background = lvl.bg;
+      text.textContent      = `قوة كلمة المرور: ${lvl.label}`;
+      text.style.color      = lvl.bg;
+    }
+
+    /* ══════ SAVE PASSWORD ══════ */
+    async function savePassword() {
+      const oldPassword     = document.getElementById('cpOld').value;
+      const newPassword     = document.getElementById('cpNew').value;
+      const confirmPassword = document.getElementById('cpConfirm').value;
+
+      if (!oldPassword)     { toast('أدخل كلمة المرور الحالية', 'error'); return; }
+      if (!newPassword)     { toast('أدخل كلمة المرور الجديدة', 'error'); return; }
+      if (newPassword.length < 6) { toast('كلمة المرور قصيرة جداً (٦ أحرف على الأقل)', 'error'); return; }
+      if (newPassword !== confirmPassword) { toast('كلمتا المرور غير متطابقتين', 'error'); return; }
+      if (oldPassword === newPassword) { toast('كلمة المرور الجديدة مطابقة للقديمة', 'error'); return; }
+
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = 'جاري الحفظ...';
+
+      const res = await api.post('/authenticate/change-password', {
+        userId: currentUser.userId,
+        oldPassword,
+        newPassword,
+        confirmPassword,
+      });
+
+      btn.disabled = false; btn.textContent = '🔑 حفظ كلمة المرور';
+
+      if (res?.success) {
+        toast('تم تغيير كلمة المرور بنجاح — سيتم تسجيل خروجك');
+        document.getElementById('cpOld').value     = '';
+        document.getElementById('cpNew').value     = '';
+        document.getElementById('cpConfirm').value = '';
+        document.getElementById('strengthFill').style.width = '0';
+        document.getElementById('strengthText').textContent = '';
+        // تسجيل الخروج بعد ثانيتين لأن السيشن اتلغى
+        setTimeout(() => logout(), 2000);
+      } else {
+        toast(res?.message || 'فشل تغيير كلمة المرور', 'error');
+      }
+    }
+
+    /* ══════ SAVE PROFILE (Admin only) ══════ */
+    async function saveProfile() {
+      const fullName   = document.getElementById('pfFullName').value.trim();
+      const phone      = document.getElementById('pfPhone').value.trim();
+      const nationalId = document.getElementById('pfNationalId').value.trim();
+
+      if (!fullName) { toast('الاسم الكامل لا يمكن أن يكون فارغاً', 'error'); return; }
+
+      const btn = event.target;
+      btn.disabled = true; btn.textContent = 'جاري الحفظ...';
+
+      const res = await api.put('/authenticate/update-profile', {
+        userId:     currentUser.userId,
+        fullName:   fullName || null,
+        nationalId: nationalId !== '' ? nationalId : '',   // '' = مسح، undefined = لم يُغيَّر
+        phoneNumber: phone !== '' ? phone : '',
+      });
+
+      btn.disabled = false; btn.textContent = '💾 حفظ التعديلات';
+
+      if (res?.success) {
+        toast('تم حفظ التعديلات بنجاح ✓');
+        // تحديث البيانات المحلية
+        currentUser.fullName   = fullName;
+        currentUser.phoneNumber = phone || null;
+        currentUser.nationalId  = nationalId || null;
+
+        // تحديث اسم الـ sidebar
+        const me = Auth.getUser();
+        me.fullName = fullName; me.name = fullName;
+        localStorage.setItem('tbus_user', JSON.stringify(me));
+
+        // إعادة رسم الملخص
+        renderProfileSummary();
+      } else {
+        toast(res?.message || 'فشل حفظ التعديلات', 'error');
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

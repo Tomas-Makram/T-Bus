@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>الحسابات - UBus</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .filters-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
+    .filters-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end}
+    .filter-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.mini-label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:5px}
+    .selected-bar{display:none;background:var(--primary-light);color:var(--primary);border:1px solid rgba(79,70,229,.18);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.selected-bar.show{display:flex}
+    .driver-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden}.driver-card:hover{box-shadow:var(--shadow-md)}
+    .driver-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;cursor:pointer;background:linear-gradient(90deg,rgba(79,70,229,.08),transparent),var(--bg-card);border-bottom:1px solid var(--border)}
+    .driver-main{display:flex;align-items:center;gap:12px;min-width:0}.driver-avatar{width:50px;height:50px;border-radius:14px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0}
+    .driver-name{font-size:17px;font-weight:800;color:var(--text)}.driver-meta{font-size:12px;color:var(--text-muted);margin-top:3px}.driver-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.chevron{transition:transform .18s;color:var(--text-muted);font-size:18px}.chevron.open{transform:rotate(180deg)}
+    .driver-trips{display:none;padding:14px;background:var(--bg)}.driver-trips.open{display:block}.driver-total{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-top:12px}
+    .trip-card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden}.trip-card.done{border-right:5px solid var(--success)}.trip-card.not-done{border-right:5px solid var(--warning)}
+    .trip-top{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:14px}.trip-select-wrap{display:flex;align-items:center;justify-content:center}.trip-select-wrap input{width:18px;height:18px;cursor:pointer}.route{font-size:16px;font-weight:800;color:var(--text);line-height:1.4}.trip-sub{font-size:12px;color:var(--text-muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}.trip-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.net-pill{border-radius:999px;padding:7px 12px;font-weight:800;font-size:13px;white-space:nowrap}.net-pay{background:var(--danger-light);color:var(--danger)}.net-get{background:var(--success-light);color:var(--success)}.net-zero{background:var(--info-light);color:var(--info)}
+    .money-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;padding:0 14px 14px}.money-box{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:10px 12px;min-height:74px}.money-box .label{font-size:12px;color:var(--text-muted);margin-bottom:6px}.money-box .value{font-size:16px;font-weight:900;color:var(--text)}.value.red{color:var(--danger)}.value.green{color:var(--success)}.value.amber{color:var(--warning)}.value.blue{color:var(--info)}
+    .quick-lines{display:grid;grid-template-columns:1fr 1fr;gap:10px;border-top:1px solid var(--border);padding:12px 14px;background:rgba(15,23,42,.02)}.quick-section-title{font-size:13px;font-weight:800;margin-bottom:8px;color:var(--text)}.quick-list{display:flex;flex-direction:column;gap:7px}.quick-row{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}.quick-row.tahseel{border-right:4px solid var(--success)}.quick-row.payment{border-right:4px solid var(--warning)}.quick-row .amount{font-weight:900}.quick-row .note{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px}.empty-line{border:1px dashed var(--border);border-radius:10px;padding:10px;color:var(--text-muted);font-size:12px;background:var(--bg-card)}
+    .accounted-badge{background:var(--success-light);color:var(--success)}.pending-badge{background:var(--warning-light);color:var(--warning)}
+    .settled-pill{background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:900;box-shadow:0 0 0 3px rgba(34,197,94,.14);white-space:nowrap}
+    .settled-strip{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:var(--success);border-radius:10px;padding:8px 12px;font-weight:900;font-size:13px;margin:0 14px 12px;text-align:center}
+    .trip-card.done{background:linear-gradient(90deg,rgba(34,197,94,.08),transparent 22%),var(--bg-card)}.detail-section-title{font-weight:800;font-size:14px;color:var(--text);margin:18px 0 10px}.detail-list{display:flex;flex-direction:column;gap:8px}.detail-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;flex-wrap:wrap}.detail-row.tahseel{border-right:4px solid var(--success)}.detail-row.payment{border-right:4px solid var(--warning)}
+    @media(max-width:760px){.header{height:auto;min-height:var(--header-h);padding-block:10px}.driver-header{align-items:flex-start}.driver-summary{width:100%;justify-content:flex-start}.trip-top{grid-template-columns:auto 1fr}.trip-actions{grid-column:1/-1;justify-content:flex-start}.quick-lines{grid-template-columns:1fr}.money-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.filters-grid{grid-template-columns:1fr}.filter-actions .btn{flex:1 1 140px;justify-content:center}.driver-trips{padding:10px}.trip-card{border-radius:12px}.route{font-size:15px}}
+    @media(max-width:420px){.money-grid{grid-template-columns:1fr}.trip-top{padding:12px}.money-grid{padding:0 12px 12px}.quick-lines{padding:12px}}
+  </style>
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+  <div id="sidebarMount"></div>
+  <div class="main-wrapper">
+    <header class="header"><div class="header-title">الحسابات</div><div class="header-actions"><button id="themeToggle" class="btn-icon" title="تغيير المظهر"></button></div></header>
+    <main class="page-content">
+      <div class="stats-grid" id="topStats" style="margin-bottom:20px"><div class="stat-card"><div class="spinner" style="margin:auto"></div></div></div>
+      <div class="filters-card">
+        <div class="filters-grid">
+          <div><label class="mini-label">السائق</label><select id="driverFilter"><option value="">كل السائقين</option></select></div>
+          <div><label class="mini-label">الحافلة</label><select id="busFilter"><option value="">كل الحافلات</option></select></div>
+          <div><label class="mini-label">من</label><select id="fromLocationFilter"><option value="">كل مناطق الانطلاق</option></select></div>
+          <div><label class="mini-label">إلى</label><select id="toLocationFilter"><option value="">كل مناطق الوصول</option></select></div>
+          <div><label class="mini-label">من تاريخ</label><input type="date" id="fromDate"></div>
+          <div><label class="mini-label">إلى تاريخ</label><input type="date" id="toDate"></div>
+          <div><label class="mini-label">حالة الحساب</label><select id="doneFilter"><option value="">الكل</option><option value="done">تم الحساب</option><option value="notDone">لم يتم الحساب</option></select></div>
+          <div><label class="mini-label">نوع الرحلة</label><select id="tripOwnerFilter"><option value="">كل الرحلات</option><option value="mine">رحلات Go Bus</option><option value="company">رحلات الشركات الأخرى</option></select></div>
+        </div>
+        <div class="filter-actions">
+          <button class="btn btn-outline btn-sm" onclick="clearFilters()">مسح الفلاتر</button>
+          <button class="btn btn-outline btn-sm" onclick="toggleAll(true)">فتح الكل</button>
+          <button class="btn btn-outline btn-sm" onclick="toggleAll(false)">إغلاق الكل</button>
+          <button class="btn btn-success btn-sm" onclick="markSelectedTripsDone()">✓ تم الحساب</button>
+          <button class="btn btn-outline btn-sm" onclick="downloadExcel()">⬇ تنزيل Excel</button>
+        </div>
+      </div>
+      <div class="selected-bar" id="selectedBar"><div>عدد الرحلات المحددة: <strong id="selectedCount">0</strong></div><button class="btn btn-success btn-sm" onclick="markSelectedTripsDone()">✓ تم الحساب للرحلات المحددة</button></div>
+      <div id="accountsContainer"><div class="loader"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+    </main>
+  </div>
+  <div class="modal-overlay" id="tripModal"><div class="modal modal-lg"><div class="modal-header"><div class="modal-title">تفاصيل الرحلة</div><button class="btn-icon" onclick="closeModal('tripModal')">✕</button></div><div class="modal-body" id="tripModalBody"></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('tripModal')">إغلاق</button></div></div></div>
+  <script src="../js/app.js"></script>
+  <script src="../js/xlsx-bundle.js"></script>
+  <script>
+    if (!requireAuth()) throw '';
+
+    // تنسيق المبالغ بدون فواصل وبدون أصفار عشرية مزعجة
+    function fmtMoney(value) {
+      const x = Number(value || 0);
+      if (!Number.isFinite(x)) return '0 ج.م';
+      const rounded = Math.round(x * 100) / 100;
+      const text = Number.isInteger(rounded)
+        ? String(rounded)
+        : String(rounded).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+      return `${text} ج.م`;
+    }
+
+    document.getElementById('sidebarMount').innerHTML = buildSidebar('accounts');
+    let allDrivers = [], allBuses = [], allTrips = [], selectedTripIds = new Set();
+    const n = v => { const x = Number(v || 0); return Number.isFinite(x) ? x : 0; };
+    const money = v => `${Math.round(n(v) * 100) / 100} ج.م`;
+    const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    const idOf = (x,...ks) => ks.map(k => x?.[k]).find(v => v !== undefined && v !== null) || '';
+    const paymentsOf = t => t?.payments || t?.Payments || [];
+    const tahseelOf = t => t?.tahseelItems || t?.TahseelItems || t?.tahseels || t?.Tahseels || [];
+    const amountOf = x => n(x?.amount ?? x?.Amount);
+    const noteOf = x => x?.notes || x?.Notes || '';
+    const userOf = x => x?.userName || x?.UserName || x?.createdByName || x?.CreatedByName || x?.userFullName || x?.fullName || '—';
+    const tripIdOf = t => idOf(t,'tripId','TripId');
+    const driverIdOf = t => idOf(t,'driverId','DriverId');
+    const busIdOf = t => idOf(t,'busId','BusId');
+    const busNameOf = t => t?.busName || t?.BusName || '—';
+    const totalPayments = t => n(t?.totalPayments ?? t?.TotalPayments ?? paymentsOf(t).reduce((s,p)=>s+amountOf(p),0));
+    const totalTahseel = t => n(t?.totalTahseel ?? t?.TotalTahseel ?? tahseelOf(t).reduce((s,x)=>s+amountOf(x),0));
+    const custody = t => n(t?.cache ?? t?.Cache); // المتبقي الحالي من العهدة
+    const solar = t => n(t?.solar ?? t?.Solar);
+    const driverPrice = t => n(t?.driverPrice ?? t?.DriverPrice);
+    const tripPrice = t => n(t?.tripPrice ?? t?.TripPrice);
+    function parseCoverageValue(raw, key) {
+      const m = String(raw || '').match(new RegExp(key + '=([0-9.]+)', 'i'));
+      return m ? n(m[1]) : 0;
+    }
+    function parseCoverage(p) {
+      const amount = amountOf(p);
+      const raw = String(p?.paymentType || p?.PaymentType || p?.paymentSource || p?.source || '').trim();
+      const lower = raw.toLowerCase();
+      if (lower.includes('mixed')) {
+        return {
+          cache: parseCoverageValue(raw, 'Cache'),
+          tahseel: parseCoverageValue(raw, 'Tahseel'),
+          pocket: parseCoverageValue(raw, 'NoCustody')
+        };
+      }
+      if (lower.includes('tahseel')) return { cache: 0, tahseel: amount, pocket: 0 };
+      if (lower.includes('nocustody') || lower.includes('no') || lower.includes('جيب')) return { cache: 0, tahseel: 0, pocket: amount };
+      if (lower.includes('cache') || lower.includes('cash') || lower.includes('عهدة')) return { cache: amount, tahseel: 0, pocket: 0 };
+      return { cache: 0, tahseel: 0, pocket: 0 };
+    }
+    const usedCustody = t => paymentsOf(t).reduce((s,p)=>s+parseCoverage(p).cache, 0);
+    const usedTahseel = t => paymentsOf(t).reduce((s,p)=>s+parseCoverage(p).tahseel, 0);
+    const originalCustody = t => n(t?.originalCache ?? t?.OriginalCache ?? t?.totalCache ?? t?.TotalCache ?? t?.initialCache ?? t?.InitialCache ?? (custody(t) + usedCustody(t)));
+    const remainingTahseel = t => n(t?.tahseelRemaining ?? t?.TahseelRemaining ?? Math.max(0, totalTahseel(t) - usedTahseel(t)));
+    const paidPocket = t => n(t?.driverPaidFromPocket ?? t?.DriverPaidFromPocket ?? paymentsOf(t).reduce((s,p)=>s+parseCoverage(p).pocket, 0));
+    const remainingWithDriver = t => n(t?.remainingWithDriver ?? t?.RemainingWithDriver ?? (Math.max(0, custody(t)) + Math.max(0, remainingTahseel(t))));
+    const driverAccount = t => n(t?.driverAccountAmount ?? t?.DriverAccountAmount ?? (driverPrice(t) + paidPocket(t)));
+    const netForDriver = t => driverAccount(t) - remainingWithDriver(t); // موجب = علينا للسائق، سالب = لينا
+    const activeNetForDriver = t => isDone(t) ? 0 : netForDriver(t);
+    const adminLabel = a => a > 0 ? 'علينا' : a < 0 ? 'لينا' : 'متوازن';
+    const adminColorClass = a => a > 0 ? 'net-pay' : a < 0 ? 'net-get' : 'net-zero';
+    const routeLabel = t => `${t?.fromLocation || t?.FromLocation || ''} ← ${t?.toLocation || t?.ToLocation || ''}`;
+    const isCompanyTrip = t => t?.isCompany === true || t?.IsCompany === true || t?.inSide === true || t?.InSide === true;
+    const companyNameOf = t => (t?.companyName || t?.CompanyName || '').trim();
+    const tripTypeBadge = t => isCompanyTrip(t) ? `<span class="badge badge-purple">شركة أخرى: ${esc(companyNameOf(t) || '—')}</span>` : '<span class="badge badge-success">رحلات Go Bus</span>';
+    const isDone = t => t?.isDone === true || t?.IsDone === true;
+        function canPermanentDeleteTrip(t) {
+      return t?.canBePermanentlyDeleted === true || t?.CanBePermanentlyDeleted === true;
+    }
+
+    function permanentDeleteTitle(t) {
+      const reason = t?.permanentDeleteReason || t?.PermanentDeleteReason || '';
+      return canPermanentDeleteTrip(t)
+        ? (reason || 'حذف الرحلة نهائياً بكل المصروفات والتحصيلات المرتبطة بها')
+        : (reason || 'لا يمكن حذف هذه الرحلة');
+    }
+
+    function permanentDeleteButton(t) {
+      const id = tripIdOf(t);
+      if (!id || !canPermanentDeleteTrip(t)) return '';
+      return `<button class="btn btn-danger btn-sm" title="${esc(permanentDeleteTitle(t))}" onclick="event.stopPropagation(); permanentDeleteTrip('${esc(id)}')">حذف الرحلة</button>`;
+    }
+
+    const tripCreatedBy = t => t?.adminName || t?.userFullName || t?.createdByName || t?.createdBy || t?.userName || '—';
+    const paymentCreatedBy = p => p?.userFullName || p?.fullName || p?.userName || p?.createdByName || p?.createdBy || p?.addedByName || p?.addedBy || '—';
+    const notesOf = t => (t?.notes || t?.Notes || '').trim();
+    function paymentSourceLabel(p){
+      const c = parseCoverage(p);
+      const parts = [];
+      if (c.cache > 0) parts.push(`${money(c.cache)} من العهدة`);
+      if (c.tahseel > 0) parts.push(`${money(c.tahseel)} من التحصيل`);
+      if (c.pocket > 0) parts.push(`${money(c.pocket)} من جيب السائق`);
+      if (parts.length) return parts.join(' + ');
+      const raw = String(p?.paymentType || p?.PaymentType || p?.paymentSource || p?.source || '').trim().toLowerCase();
+      if (raw.includes('tahseel') || raw.includes('تحصيل')) return 'خصم من التحصيل';
+      if (raw.includes('nocustody') || raw.includes('no') || raw.includes('جيب')) return 'دفع من جيب السائق';
+      if (raw.includes('cache') || raw.includes('cash') || raw.includes('عهدة')) return 'خصم من العهدة';
+      return 'مصروف';
+    }
+    function buildAllocations(t){
+      return paymentsOf(t).map(p => {
+        const c = parseCoverage(p);
+        if ((c.cache + c.tahseel + c.pocket) > 0) {
+          return { payment: p, fromCash: c.cache, fromTah: c.tahseel, pocket: c.pocket };
+        }
+        return { payment: p, fromCash: 0, fromTah: 0, pocket: amountOf(p) };
+      });
+    }
+    function allocationText(a){
+      const parts=[];
+      if(a.fromCash>0) parts.push(`${money(a.fromCash)} من العهدة`);
+      if(a.fromTah>0) parts.push(`${money(a.fromTah)} من التحصيل`);
+      if(a.pocket>0) parts.push(`${money(a.pocket)} من جيب السائق`);
+      return parts.join(' + ') || paymentSourceLabel(a.payment);
+    }
+    function netPill(t){ const a = netForDriver(t); return `<span class="net-pill ${adminColorClass(a)}">${adminLabel(a)} ${money(Math.abs(a))}</span>`; }
+    function moneyGrid(t){ return `<div class="money-grid">
+      <div class="money-box"><div class="label">سعر التشغيلة</div><div class="value">${money(tripPrice(t))}</div></div>
+      <div class="money-box"><div class="label">كومسيون السائق</div><div class="value">${money(driverPrice(t))}</div></div>
+      <div class="money-box"><div class="label">العهدة الأصلية</div><div class="value blue">${money(originalCustody(t))}</div></div>
+      <div class="money-box"><div class="label">المتبقي من العهدة</div><div class="value blue">${money(custody(t))}</div></div>
+      <div class="money-box"><div class="label">تحصيل</div><div class="value green">${money(totalTahseel(t))}</div></div>
+      <div class="money-box"><div class="label">المصروفات</div><div class="value red">${money(totalPayments(t))}</div></div>
+      <div class="money-box"><div class="label">سولار</div><div class="value amber">${money(solar(t))}</div></div>
+      <div class="money-box"><div class="label">المتبقي من التحصيل</div><div class="value green">${money(remainingTahseel(t))}</div></div>
+      <div class="money-box"><div class="label">المتبقي معه</div><div class="value blue">${money(remainingWithDriver(t))}</div></div>
+      <div class="money-box"><div class="label">دفع من جيبه</div><div class="value red">${money(paidPocket(t))}</div></div>
+      <div class="money-box"><div class="label">حساب السائق</div><div class="value">${money(driverAccount(t))}</div></div>
+      <div class="money-box"><div class="label">صافي الحساب</div><div class="value ${netForDriver(t)>0?'red':netForDriver(t)<0?'green':''}">${adminLabel(netForDriver(t))} ${money(Math.abs(netForDriver(t)))}</div></div>
+    </div>${isDone(t) ? '<div class="settled-strip">✓ تم الحساب — هذه الرحلة لا تدخل في صافي الحساب الكلي بالأعلى</div>' : ''}`; }
+    function quickLists(t){
+      const th = tahseelOf(t); const pays = paymentsOf(t); const allocations = buildAllocations(t);
+      return `<div class="quick-lines"><div><div class="quick-section-title">التحصيلات (${th.length})</div><div class="quick-list">${th.length ? th.slice(0,3).map(x => `<div class="quick-row tahseel"><div><span class="amount green">${money(amountOf(x))}</span><span class="note"> - ${esc(noteOf(x) || 'بدون ملاحظات')} - ${esc(userOf(x))}</span></div></div>`).join('') : '<div class="empty-line">لا توجد تحصيلات</div>'}</div></div><div><div class="quick-section-title">المصروفات (${pays.length})</div><div class="quick-list">${pays.length ? allocations.slice(0,3).map(a => `<div class="quick-row payment"><div><span class="amount red">${money(amountOf(a.payment))}</span><span class="note"> - ${esc(noteOf(a.payment) || 'بدون ملاحظات')} - ${esc(allocationText(a))}</span></div></div>`).join('') : '<div class="empty-line">لا توجد مصروفات</div>'}</div></div></div>`;
+    }
+    async function loadAll(){ const [dr,bu,tr] = await Promise.all([api.get('/management/drivers'), api.get('/management/buses'), api.get('/management/trips')]); allDrivers = dr?.data || []; allBuses = bu?.data || []; allTrips = tr?.data || []; populateDriverFilter(); populateBusFilter(); populateLocationFilters(); renderStats(); renderAccounts(); }
+    function populateDriverFilter(){ const sel = driverFilter, current = sel.value; sel.innerHTML = '<option value="">كل السائقين</option>' + allDrivers.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar')).map(d => `<option value="${esc(d.driverId)}">${esc(d.name)}</option>`).join(''); if (allDrivers.some(d => d.driverId === current)) sel.value = current; }
+    function populateBusFilter(){ const sel = busFilter, current = sel.value; sel.innerHTML = '<option value="">كل الحافلات</option>' + allBuses.slice().sort((a,b)=>(a.name||a.busName||'').localeCompare(b.name||b.busName||'','ar')).map(b => `<option value="${esc(b.busId || b.BusId)}">${esc((b.name || b.Name || b.busName || b.BusName || 'حافلة') + ((b.plateNumber || b.PlateNumber || b.plate || b.Plate) ? ' - ' + (b.plateNumber || b.PlateNumber || b.plate || b.Plate) : ''))}</option>`).join(''); if (allBuses.some(b => (b.busId || b.BusId) === current)) sel.value = current; }
+    function getTripsForLocationLists(){ const d = driverFilter.value, b = busFilter.value; return allTrips.filter(t => (!d || driverIdOf(t) === d) && (!b || busIdOf(t) === b)); }
+    function populateLocationFilters(){ const trips = getTripsForLocationLists(); const fs = fromLocationFilter, ts = toLocationFilter, cf = fs.value, ct = ts.value; const froms = [...new Set(trips.map(t => t.fromLocation || t.FromLocation).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar')); const tos = [...new Set(trips.map(t => t.toLocation || t.ToLocation).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar')); fs.innerHTML = '<option value="">كل مناطق الانطلاق</option>' + froms.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); ts.innerHTML = '<option value="">كل مناطق الوصول</option>' + tos.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); if(froms.includes(cf)) fs.value=cf; if(tos.includes(ct)) ts.value=ct; }
+    function getFilteredTrips(){ const d=driverFilter.value, b=busFilter.value, fd=fromDate.value, td=toDate.value, fl=fromLocationFilter.value, tl=toLocationFilter.value, done=doneFilter.value, owner=tripOwnerFilter.value; return allTrips.filter(t => (!d || driverIdOf(t) === d) && (!b || busIdOf(t) === b) && (!fd || (t.tripDate||t.TripDate||'').slice(0,10) >= fd) && (!td || (t.tripDate||t.TripDate||'').slice(0,10) <= td) && (!fl || (t.fromLocation||t.FromLocation) === fl) && (!tl || (t.toLocation||t.ToLocation) === tl) && (!done || (done === 'done' ? isDone(t) : !isDone(t))) && (!owner || (owner === 'company' ? isCompanyTrip(t) : !isCompanyTrip(t)))).sort((a,b)=>new Date(b.tripDate||b.TripDate) - new Date(a.tripDate||a.TripDate)); }
+    function getFilteredDrivers(){ const d=driverFilter.value, trips=getFilteredTrips(), ids=new Set(trips.map(driverIdOf)); return allDrivers.filter(x => d ? x.driverId === d : ids.has(x.driverId)); }
+    function clearFilters(){ driverFilter.value=''; busFilter.value=''; fromDate.value=''; toDate.value=''; doneFilter.value=''; tripOwnerFilter.value=''; populateLocationFilters(); fromLocationFilter.value=''; toLocationFilter.value=''; selectedTripIds.clear(); updateSelectedBar(); renderStats(); renderAccounts(); }
+    function renderStats(){
+      const trips=getFilteredTrips();
+      const openTrips = trips.filter(t => !isDone(t));
+      const settledTrips = trips.filter(isDone);
+      const balance=openTrips.reduce((s,t)=>s+netForDriver(t),0);
+      topStats.innerHTML = `
+      <div class="stat-card"><div class="stat-icon blue">👤</div><div><div class="stat-value">${getFilteredDrivers().length}</div><div class="stat-label">السائقون</div></div></div>
+      <div class="stat-card"><div class="stat-icon amber">🗺️</div><div><div class="stat-value">${trips.length}</div><div class="stat-label">الرحلات</div></div></div>
+      <div class="stat-card"><div class="stat-icon blue">💼</div><div><div class="stat-value" style="font-size:16px">${money(trips.reduce((s,t)=>s+originalCustody(t),0))}</div><div class="stat-label">إجمالي العهدة الأصلية</div></div></div>
+      <div class="stat-card"><div class="stat-icon green">💵</div><div><div class="stat-value" style="font-size:16px">${money(trips.reduce((s,t)=>s+totalTahseel(t),0))}</div><div class="stat-label">إجمالي التحصيل</div></div></div>
+      <div class="stat-card"><div class="stat-icon red">🧾</div><div><div class="stat-value" style="font-size:16px">${money(trips.reduce((s,t)=>s+totalPayments(t),0))}</div><div class="stat-label">إجمالي المصروفات</div></div></div>
+      <div class="stat-card"><div class="stat-icon purple">⛽</div><div><div class="stat-value" style="font-size:16px">${money(trips.reduce((s,t)=>s+solar(t),0))}</div><div class="stat-label">إجمالي السولار</div></div></div>
+      <div class="stat-card"><div class="stat-icon green">✓</div><div><div class="stat-value" style="font-size:16px;color:var(--success)">${settledTrips.length}</div><div class="stat-label">رحلات تم حسابها</div></div></div>
+      <div class="stat-card"><div class="stat-icon green">👨‍✈️</div><div><div class="stat-value" style="font-size:16px;color:${balance>0?'var(--danger)':balance<0?'var(--success)':'var(--text)'}">${adminLabel(balance)} ${money(Math.abs(balance))}</div><div class="stat-label">صافي غير المحاسب</div></div></div>`; }
+    function renderAccounts(){ const trips=getFilteredTrips(), drivers=getFilteredDrivers(); selectedTripIds = new Set([...selectedTripIds].filter(id => trips.some(t => tripIdOf(t) === id))); updateSelectedBar(); if(!drivers.length){ accountsContainer.innerHTML = '<div class="empty-state"><p>لا توجد رحلات مطابقة للفلاتر</p></div>'; return; } accountsContainer.innerHTML = drivers.map(d => { const ts = trips.filter(t => driverIdOf(t) === d.driverId); const bal = ts.filter(t=>!isDone(t)).reduce((s,t)=>s+netForDriver(t),0); const settled=ts.filter(isDone).length; return `<div class="driver-card"><div class="driver-header" onclick="toggleDriver('${esc(d.driverId)}')"><div class="driver-main"><div class="driver-avatar">${esc((d.name||'س')[0])}</div><div><div class="driver-name">${esc(d.name||'—')}</div><div class="driver-meta">${esc(d.nationalId||'')} ${d.phoneNumbers?.length ? ' | ' + esc(d.phoneNumbers[0]) : ''}</div></div></div><div class="driver-summary"><span class="badge badge-info">${ts.length} رحلة</span><span class="settled-pill">✓ تم الحساب ${settled}</span><span class="badge badge-info">عهدة ${money(ts.reduce((s,t)=>s+originalCustody(t),0))}</span><span class="badge badge-success">تحصيل ${money(ts.reduce((s,t)=>s+totalTahseel(t),0))}</span><span class="badge badge-danger">مصروفات ${money(ts.reduce((s,t)=>s+totalPayments(t),0))}</span><span class="badge badge-info">متبقي معه ${money(ts.reduce((s,t)=>s+remainingWithDriver(t),0))}</span><span class="net-pill ${adminColorClass(bal)}">غير محاسب: ${adminLabel(bal)} ${money(Math.abs(bal))}</span></div><span class="chevron open" id="chev-${esc(d.driverId)}">▼</span></div><div class="driver-trips open" id="trips-${esc(d.driverId)}">${ts.map((t,i)=>renderTripCard(t,i)).join('')}${renderDriverTotal(d,ts)}</div></div>`; }).join(''); document.querySelectorAll('.trip-select').forEach(c => c.checked = selectedTripIds.has(c.value)); }
+    function renderDriverTotal(d,trips){
+      const openTrips = trips.filter(t => !isDone(t));
+      const settled = trips.filter(isDone).length;
+      const bal=openTrips.reduce((s,t)=>s+netForDriver(t),0);
+      return `<div class="driver-total"><strong>إجمالي ${esc(d.name||'السائق')}</strong><div class="driver-summary"><span class="badge badge-info">${trips.length} رحلة</span><span class="settled-pill">✓ تم الحساب ${settled}</span><span class="badge badge-info">عهدة ${money(trips.reduce((s,t)=>s+originalCustody(t),0))}</span><span class="badge badge-success">تحصيل ${money(trips.reduce((s,t)=>s+totalTahseel(t),0))}</span><span class="badge badge-danger">مصروفات ${money(trips.reduce((s,t)=>s+totalPayments(t),0))}</span><span class="badge badge-purple">حساب السائق ${money(trips.reduce((s,t)=>s+driverAccount(t),0))}</span><span class="net-pill ${adminColorClass(bal)}">غير محاسب: ${adminLabel(bal)} ${money(Math.abs(bal))}</span></div></div>`;
+    }
+    function renderTripCard(t,idx){
+      const done=isDone(t), id=tripIdOf(t);
+      return `<div class="trip-card ${done?'done':'not-done'}"><div class="trip-top"><div class="trip-select-wrap" onclick="event.stopPropagation()"><input type="checkbox" class="trip-select" value="${esc(id)}" ${done?'disabled':''} onchange="toggleTripSelection(this)"></div><div onclick="showTripDetail('${esc(id)}')"><div class="route">${esc(routeLabel(t))}</div><div class="trip-sub"><span>${fmtDate(t.tripDate||t.TripDate)}</span><span>${esc(busNameOf(t))}</span><span class="badge ${done?'accounted-badge':'pending-badge'}">${done?'تم الحساب':'لم يتم الحساب'}</span>${done?'<span class="settled-pill">✓ اتحاسبت</span>':''}${tripTypeBadge(t)}${notesOf(t)?`<span>ملاحظات: ${esc(notesOf(t))}</span>`:''}</div></div><div class="trip-actions">${permanentDeleteButton(t)}<button class="btn btn-outline btn-sm" onclick="showTripDetail('${esc(id)}')">تفاصيل</button>${done?'<span class="settled-pill">✓ تم الحساب</span>':netPill(t)}</div></div>${moneyGrid(t)}${quickLists(t)}</div>`;
+    }
+    async function permanentDeleteTrip(id){
+      const trip = allTrips.find(x => tripIdOf(x) === id);
+      if (!trip) { toast('لم يتم العثور على الرحلة', 'error'); return; }
+      if (!canPermanentDeleteTrip(trip)) { toast(permanentDeleteTitle(trip), 'error'); return; }
+
+      const message = `سيتم حذف الرحلة نهائياً بكل المصروفات والتحصيلات المرتبطة بها.\n${routeLabel(trip)}\nهل أنت متأكد؟`;
+      if (!window.confirm(message)) return;
+
+      const res = await api.delete(`/management/trips/${id}/permanent`);
+      if (res?.success) {
+        toast(res.message || 'تم حذف الرحلة نهائياً');
+        selectedTripIds.delete(id);
+        await loadAll();
+      } else {
+        toast(res?.message || 'فشل حذف الرحلة', 'error');
+      }
+    }
+
+    function toggleDriver(id){ const e=document.getElementById(`trips-${id}`), c=document.getElementById(`chev-${id}`); if(!e)return; const open=e.classList.toggle('open'); c?.classList.toggle('open',open); }
+    function toggleAll(open){ allDrivers.forEach(d => { const e=document.getElementById(`trips-${d.driverId}`), c=document.getElementById(`chev-${d.driverId}`); e?.classList.toggle('open', open); c?.classList.toggle('open', open); }); }
+    function toggleTripSelection(chk){ chk.checked ? selectedTripIds.add(chk.value) : selectedTripIds.delete(chk.value); updateSelectedBar(); }
+    function updateSelectedBar(){ selectedCount.textContent = selectedTripIds.size; selectedBar.classList.toggle('show', selectedTripIds.size > 0); }
+    async function markSelectedTripsDone(){ const ids=[...selectedTripIds]; if(!ids.length){ toast('اختر رحلة واحدة على الأقل','error'); return; } const res=await api.put('/management/trips/mark-done',{tripIds:ids}); if(res?.success){ toast('تم حساب الرحلات المحددة ✓'); selectedTripIds.clear(); await loadAll(); } else toast(res?.message || 'فشل تحديث حالة الحساب','error'); }
+    function showTripDetail(id){ const t=allTrips.find(x=>tripIdOf(x)===id); if(!t)return; const allocations=buildAllocations(t); tripModalBody.innerHTML = `<div style="background:var(--primary-light);border-radius:12px;padding:16px 20px;margin-bottom:18px"><div dir="ltr" style="font-size:20px;font-weight:800;color:var(--primary);text-align:right">${esc(routeLabel(t))}</div><div style="font-size:13px;color:var(--text-muted);margin-top:5px">${fmtDateTime(t.tripDate||t.TripDate)} | ${tripTypeBadge(t)} | ${isDone(t)?'تم الحساب':'لم يتم الحساب'}</div></div>${moneyGrid(t)}<div class="detail-section-title">التحصيلات (${tahseelOf(t).length})</div><div class="detail-list">${tahseelOf(t).length ? tahseelOf(t).map(x => `<div class="detail-row tahseel"><div><strong class="text-success">${money(amountOf(x))}</strong> <span style="color:var(--text-muted)">${esc(noteOf(x)||'بدون ملاحظات')}</span></div><span class="badge badge-info">${esc(userOf(x))}</span></div>`).join('') : '<div class="empty-line">لا توجد تحصيلات</div>'}</div><div class="detail-section-title">المصروفات (${paymentsOf(t).length})</div><div class="detail-list">${paymentsOf(t).length ? allocations.map(a => `<div class="detail-row payment"><div><strong class="text-danger">${money(amountOf(a.payment))}</strong> <span style="color:var(--text-muted)">${esc(noteOf(a.payment)||'بدون ملاحظات')}</span><div style="font-size:12px;color:var(--text-muted);margin-top:3px">${esc(allocationText(a))}</div></div><span class="badge badge-info">${esc(paymentCreatedBy(a.payment))}</span></div>`).join('') : '<div class="empty-line">لا توجد مصروفات</div>'}</div>`; openModal('tripModal'); }
+    function downloadExcel(){ const trips=getFilteredTrips(); if(!trips.length){ toast('لا توجد بيانات للتصدير','error'); return; } if(typeof XLSX==='undefined'){ toast('تعذر تحميل مكتبة Excel','error'); return; } const rows=trips.map(t=>({'السائق':t.driverName||t.DriverName||'','التاريخ':fmtDate(t.tripDate||t.TripDate),'المسار':routeLabel(t),'الحافلة':busNameOf(t),'نوع الرحلة':isCompanyTrip(t)?companyNameOf(t)||'شركة أخرى':'رحلات Go Bus','سعر التشغيلة':tripPrice(t),'كومسيون السائق':driverPrice(t),'العهدة الأصلية':originalCustody(t),'المتبقي من العهدة':custody(t),'تحصيل':totalTahseel(t),'المتبقي من التحصيل':remainingTahseel(t),'المصروفات':totalPayments(t),'سولار':solar(t),'دفع من جيبه':paidPocket(t),'المتبقي معه':remainingWithDriver(t),'حساب السائق':driverAccount(t),'حالة الحساب':isDone(t)?'تم الحساب':'لم يتم الحساب','الصافي غير المحاسب':isDone(t)?'تم الحساب':`${adminLabel(netForDriver(t))} ${Math.abs(netForDriver(t))}`})); const ws=XLSX.utils.json_to_sheet(rows); ws['!dir']='rtl'; const wb=XLSX.utils.book_new(); wb.Workbook={Views:[{RTL:true}]}; XLSX.utils.book_append_sheet(wb,ws,'الحسابات'); XLSX.writeFile(wb,`accounts-${new Date().toISOString().slice(0,10)}.xlsx`); }
+    driverFilter.addEventListener('change',()=>{ fromLocationFilter.value=''; toLocationFilter.value=''; populateLocationFilters(); selectedTripIds.clear(); renderStats(); renderAccounts(); });
+    busFilter.addEventListener('change',()=>{ fromLocationFilter.value=''; toLocationFilter.value=''; populateLocationFilters(); selectedTripIds.clear(); renderStats(); renderAccounts(); });
+    ['fromLocationFilter','toLocationFilter','fromDate','toDate','doneFilter','tripOwnerFilter'].forEach(id => document.getElementById(id).addEventListener('change',()=>{ selectedTripIds.clear(); renderStats(); renderAccounts(); }));
+    loadAll().catch(()=>toast('خطأ في تحميل البيانات','error'));
+  </script>
+</body>
+</html>

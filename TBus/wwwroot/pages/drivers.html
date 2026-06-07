@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>السائقون - UBus</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div id="toastContainer" class="toast-container"></div>
+    <div id="sidebarMount"></div>
+
+    <div class="main-wrapper">
+        <header class="header">
+            <div class="header-title">إدارة السائقين</div>
+            <div class="header-actions">
+                <button id="themeToggle" class="btn-icon" title="تغيير المظهر"></button>
+                <button class="btn btn-primary" onclick="openCreate()">
+                    + إضافة سائق
+                </button>
+            </div>
+        </header>
+
+        <main class="page-content">
+            <!-- Search -->
+            <div class="search-bar">
+                <div class="search-input-wrap">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                    <input type="text" id="searchInput" placeholder="بحث بالاسم أو الرقم القومي أو الهاتف...">
+                </div>
+                <select id="filterSort" style="width:auto;padding:9px 12px">
+                    <option value="">ترتيب: الأحدث</option>
+                    <option value="name">ترتيب: الاسم</option>
+                </select>
+            </div>
+
+            <div class="card" style="padding:0">
+                <div id="driversTable"><div class="loader"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+                <div id="pagination" class="pagination" style="padding:12px"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create / Edit Modal -->
+    <div class="modal-overlay" id="formModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <div class="modal-title" id="formTitle">إضافة سائق جديد</div>
+                <button class="btn-icon" onclick="closeModal('formModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>الاسم الكامل</label>
+                        <input type="text" id="fName" placeholder="اسم السائق">
+                    </div>
+
+                    <div class="form-group">
+                        <label>الرقم القومي</label>
+                        <input type="text"
+                               id="fNationalId"
+                               placeholder="الرقم القومي"
+                               maxlength="14"
+                               inputmode="numeric"
+                               pattern="[0-9]{14}"
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                    </div>
+
+                    <div class="form-group full">
+                        <label>أرقام الهاتف</label>
+                        <div style="display:flex;gap:8px">
+                            <input type="tel"
+                                   id="phoneInput"
+                                   placeholder="أدخل رقم هاتف"
+                                   maxlength="11"
+                                   inputmode="numeric"
+                                   pattern="01[0-2,5]{1}[0-9]{8}"
+                                   oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                                   style="flex:1">
+                            <button class="btn btn-outline" onclick="addPhone()">+ إضافة</button>
+                        </div>
+                        <div class="phone-tags" id="phoneTags"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="saveBtn" onclick="saveDriver()">حفظ</button>
+                <button class="btn btn-outline" onclick="closeModal('formModal')">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <div class="modal-title">تفاصيل السائق</div>
+                <button class="btn-icon" onclick="closeModal('detailModal')">✕</button>
+            </div>
+            <div class="modal-body" id="detailBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="editFromDetail" onclick="">تعديل</button>
+                <button class="btn btn-outline" onclick="closeModal('detailModal')">إغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirm -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <div class="modal-title text-danger">حذف السائق</div>
+                <button class="btn-icon" onclick="closeModal('deleteModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>هل أنت متأكد من حذف السائق <strong id="deleteDriverName"></strong>؟</p>
+                <p class="text-muted mt-1" style="font-size:13px">هذا الإجراء لا يمكن التراجع عنه.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="confirmDelete">حذف</button>
+                <button class="btn btn-outline" onclick="closeModal('deleteModal')">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/app.js"></script>
+    <script>
+        if (!requireAuth()) throw '';
+        document.getElementById('sidebarMount').innerHTML = buildSidebar('drivers');
+
+        let allDrivers = [];
+        let editingId = null;
+        let phones = [];
+        let currentPage = 1;
+        const PER_PAGE = 10;
+
+        const nationalIdRegex = /^[0-9]{14}$/;
+        const phoneRegex = /^01[0-2,5]{1}[0-9]{8}$/;
+
+        async function loadDrivers() {
+            const res = await api.get('/management/drivers');
+            if (res?.success) {
+                allDrivers = res.data || [];
+                renderTable();
+            } else {
+                toast(res?.message || 'فشل التحميل', 'error');
+            }
+        }
+
+        function getFiltered() {
+            const q = document.getElementById('searchInput').value.trim().toLowerCase();
+            const sort = document.getElementById('filterSort').value;
+            let list = allDrivers.filter(d =>
+                !q ||
+                d.name?.toLowerCase().includes(q) ||
+                d.nationalId?.includes(q) ||
+                d.phoneNumbers?.some(p => p.includes(q))
+            );
+            if (sort === 'name') list = list.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            else list = list.sort((a, b) => new Date(b.jouinAt) - new Date(a.jouinAt));
+            return list;
+        }
+
+        function renderTable() {
+            const list = getFiltered();
+            const start = (currentPage - 1) * PER_PAGE;
+            const page = list.slice(start, start + PER_PAGE);
+
+            const tbody = page.length ? page.map(d => `
+            <tr>
+              <td><strong>${d.name}</strong></td>
+              <td><span style="font-family:monospace">${d.nationalId}</span></td>
+              <td>${d.phoneNumbers?.length ? d.phoneNumbers.map(p => `<span class="badge badge-info" style="margin-left:3px">${p}</span>`).join('') : '-'}</td>
+              <td>${fmtDate(d.jouinAt)}</td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-outline btn-xs" onclick="showDetail('${d.driverId}')">👁 عرض</button>
+                  <button class="btn btn-outline btn-xs" onclick="openEdit('${d.driverId}')">✏️ تعديل</button>
+                  <button class="btn btn-danger btn-xs" onclick="openDelete('${d.driverId}','${d.name.replace(/'/g, "\\'")}')">🗑 حذف</button>
+                </div>
+              </td>
+            </tr>`).join('') :
+                `<tr><td colspan="5"><div class="empty-state"><p>لا توجد نتائج</p></div></td></tr>`;
+
+            document.getElementById('driversTable').innerHTML = `
+            <table>
+              <thead><tr>
+                <th>الاسم</th><th>الرقم القومي</th><th>الهاتف</th><th>تاريخ الانضمام</th><th>الإجراءات</th>
+              </tr></thead>
+              <tbody>${tbody}</tbody>
+            </table>`;
+
+            buildPagination(
+                document.getElementById('pagination'),
+                list.length, currentPage, PER_PAGE,
+                p => { currentPage = p; renderTable(); }
+            );
+        }
+
+        document.getElementById('searchInput').addEventListener('input', () => { currentPage = 1; renderTable(); });
+        document.getElementById('filterSort').addEventListener('change', () => { currentPage = 1; renderTable(); });
+
+        // ---- Create ----
+        function openCreate() {
+            editingId = null;
+            phones = [];
+            document.getElementById('fName').value = '';
+            document.getElementById('fNationalId').value = '';
+            document.getElementById('phoneInput').value = '';
+            document.getElementById('formTitle').textContent = 'إضافة سائق جديد';
+            document.getElementById('saveBtn').textContent = 'إضافة';
+            renderPhoneTags();
+            openModal('formModal');
+        }
+
+        // ---- Edit ----
+        function openEdit(id) {
+            const d = allDrivers.find(x => x.driverId === id);
+            if (!d) return;
+            editingId = id;
+            phones = [...(d.phoneNumbers || [])];
+            document.getElementById('fName').value = d.name;
+            document.getElementById('fNationalId').value = d.nationalId;
+            document.getElementById('phoneInput').value = '';
+            document.getElementById('formTitle').textContent = 'تعديل بيانات السائق';
+            document.getElementById('saveBtn').textContent = 'حفظ التعديلات';
+            renderPhoneTags();
+            openModal('formModal');
+        }
+
+        function addPhone() {
+            const v = document.getElementById('phoneInput').value.trim();
+
+            if (!v) return;
+
+            if (!phoneRegex.test(v)) {
+                toast('رقم الهاتف غير صحيح. يجب أن يبدأ بـ 010 أو 011 أو 012 أو 015 ويكون 11 رقم', 'error');
+                return;
+            }
+
+            if (phones.includes(v)) {
+                toast('الرقم مضاف مسبقاً', 'info');
+                return;
+            }
+
+            phones.push(v);
+            document.getElementById('phoneInput').value = '';
+            renderPhoneTags();
+        }
+
+        document.getElementById('phoneInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addPhone();
+            }
+        });
+
+        function removePhone(i) {
+            phones.splice(i, 1);
+            renderPhoneTags();
+        }
+
+        function renderPhoneTags() {
+            document.getElementById('phoneTags').innerHTML = phones.map((p, i) =>
+                `<span class="phone-tag">${p}<button onclick="removePhone(${i})">×</button></span>`
+            ).join('');
+        }
+
+        async function saveDriver() {
+            const name = document.getElementById('fName').value.trim();
+            const nationalId = document.getElementById('fNationalId').value.trim();
+
+            if (!name) {
+                toast('الاسم مطلوب', 'error');
+                return;
+            }
+
+            if (!nationalId) {
+                toast('الرقم القومي مطلوب', 'error');
+                return;
+            }
+
+            if (!nationalIdRegex.test(nationalId)) {
+                toast('الرقم القومي يجب أن يكون 14 رقم', 'error');
+                return;
+            }
+
+            if (!phones.length) {
+                toast('يجب إضافة رقم هاتف واحد على الأقل', 'error');
+                return;
+            }
+
+            if (phones.some(p => !phoneRegex.test(p))) {
+                toast('يوجد رقم هاتف غير صحيح', 'error');
+                return;
+            }
+
+            const body = { name, nationalId, phoneNumbers: phones };
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true;
+
+            const res = editingId
+                ? await api.put(`/management/drivers/${editingId}`, body)
+                : await api.post('/management/drivers', body);
+
+            btn.disabled = false;
+
+            if (res?.success) {
+                toast(editingId ? 'تم تعديل بيانات السائق' : 'تم إضافة السائق بنجاح');
+                closeModal('formModal');
+                await loadDrivers();
+            } else {
+                toast(res?.message || 'فشل الحفظ', 'error');
+            }
+        }
+
+        // ---- Detail ----
+        function showDetail(id) {
+            const d = allDrivers.find(x => x.driverId === id);
+            if (!d) return;
+            document.getElementById('detailBody').innerHTML = `
+            <div class="detail-grid">
+              <div class="detail-item">
+                <label>الاسم الكامل</label>
+                <div class="detail-value">${d.name}</div>
+              </div>
+              <div class="detail-item">
+                <label>الرقم القومي</label>
+                <div class="detail-value" style="font-family:monospace">${d.nationalId}</div>
+              </div>
+              <div class="detail-item">
+                <label>تاريخ الانضمام</label>
+                <div class="detail-value">${fmtDateTime(d.jouinAt)}</div>
+              </div>
+              <div class="detail-item full">
+                <label>أرقام الهاتف</label>
+                <div class="detail-value">
+                  ${d.phoneNumbers?.length ? d.phoneNumbers.map(p => `<span class="badge badge-info" style="margin-left:4px">${p}</span>`).join('') : 'لا يوجد'}
+                </div>
+              </div>
+            </div>`;
+            document.getElementById('editFromDetail').onclick = () => { closeModal('detailModal'); openEdit(id); };
+            openModal('detailModal');
+        }
+
+        // ---- Delete ----
+        function openDelete(id, name) {
+            document.getElementById('deleteDriverName').textContent = name;
+            document.getElementById('confirmDelete').onclick = async () => {
+                const res = await api.delete(`/management/drivers/${id}`);
+                if (res?.success) {
+                    toast('تم حذف السائق');
+                    closeModal('deleteModal');
+                    await loadDrivers();
+                } else {
+                    toast(res?.message || 'فشل الحذف', 'error');
+                }
+            };
+            openModal('deleteModal');
+        }
+
+        loadDrivers();
+    </script>
+</body>
+</html>

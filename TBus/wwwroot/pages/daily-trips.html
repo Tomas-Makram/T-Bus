@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>رحلات اليوم - UBus</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .trip-money-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .money-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .money-box .label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .money-box .value {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .money-box.success .value { color: var(--success); }
+    .money-box.danger .value { color: var(--danger); }
+    .payment-type-pill {
+      font-size: 11px;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+  <div id="sidebarMount"></div>
+
+  <div class="main-wrapper">
+    <header class="header">
+      <div class="header-title" id="pageTitle">رحلات اليوم</div>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-icon" title="تغيير المظهر"></button>
+        <input type="date" id="dateFilter" title="اختر تاريخاً" style="width:auto">
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="stats-grid" id="dayStats" style="margin-bottom:20px"></div>
+
+      <div class="search-bar">
+        <div class="search-input-wrap">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="searchInput" placeholder="بحث بالمسار أو السائق...">
+        </div>
+        <select id="driverFilter" style="width:auto;padding:9px 12px">
+          <option value="">كل السائقين</option>
+        </select>
+        <select id="tripOwnerFilter" style="width:auto;padding:9px 12px">
+          <option value="">كل الرحلات</option>
+          <option value="mine">رحلاتي / رحلات الشركة</option>
+          <option value="company">رحلات الشركات الأخرى</option>
+        </select>
+      </div>
+
+      <div id="tripsContainer"><div class="loader"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+    </main>
+  </div>
+
+  <!-- Add Payment Modal -->
+  <div class="modal-overlay" id="addPayModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div class="modal-title">إضافة مصروفات الرحلة</div>
+        <button class="btn-icon" onclick="closeModal('addPayModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="payTripSummary" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--text-muted)"></div>
+
+        <div class="form-group" style="margin-bottom:12px">
+          <label>المبلغ</label>
+          <input type="number" id="payAmount" placeholder="0.00" min="0.01" step="0.01">
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px">
+          <label>نوع المصروف</label>
+          <select id="payType"></select>
+          <div id="payTypeHint" style="font-size:12px;color:var(--text-muted);margin-top:5px"></div>
+        </div>
+
+        <div class="form-group">
+          <label>ملاحظات</label>
+          <textarea id="payNotes" placeholder="ملاحظات اختيارية" style="min-height:60px"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="addPayBtn">إضافة</button>
+        <button class="btn btn-outline" onclick="closeModal('addPayModal')">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Payment Modal -->
+  <div class="modal-overlay" id="editPayModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div class="modal-title">تعديل مصروفات الرحلة</div>
+        <button class="btn-icon" onclick="closeModal('editPayModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="editPayTripSummary" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--text-muted)"></div>
+
+        <div class="form-group" style="margin-bottom:12px">
+          <label>المبلغ</label>
+          <input type="number" id="editPayAmount" placeholder="0.00" min="0.01" step="0.01">
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px">
+          <label>نوع المصروف</label>
+          <select id="editPayType"></select>
+          <div id="editPayTypeHint" style="font-size:12px;color:var(--text-muted);margin-top:5px"></div>
+        </div>
+
+        <div class="form-group">
+          <label>ملاحظات</label>
+          <textarea id="editPayNotes" placeholder="ملاحظات اختيارية" style="min-height:60px"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="editPayBtn">حفظ</button>
+        <button class="btn btn-outline" onclick="closeModal('editPayModal')">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Payment Confirm -->
+  <div class="modal-overlay" id="delPayModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div class="modal-title text-danger">حذف مصروفات الرحلة</div>
+        <button class="btn-icon" onclick="closeModal('delPayModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>هل تريد حذف هذا المصروف بقيمة <strong id="delPayAmt"></strong>؟</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="confirmDelPay">حذف</button>
+        <button class="btn btn-outline" onclick="closeModal('delPayModal')">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/app.js"></script>
+  <script>
+    if (!requireAuth()) throw '';
+
+    // تنسيق المبالغ بدون فواصل وبدون أصفار عشرية مزعجة
+    function fmtMoney(value) {
+      const x = Number(value || 0);
+      if (!Number.isFinite(x)) return '0 ج.م';
+      const rounded = Math.round(x * 100) / 100;
+      const text = Number.isInteger(rounded)
+        ? String(rounded)
+        : String(rounded).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+      return `${text} ج.م`;
+    }
+
+    document.getElementById('sidebarMount').innerHTML = buildSidebar('daily');
+
+    let allTrips = [], allDrivers = [];
+    let currentDate = new Date().toISOString().slice(0, 10);
+
+    const PAYMENT_TYPES = {
+      Visa: 'Visa',
+      Cache: 'Cache',
+      Octine: 'Octine',
+      NoCustody: 'NoCustody'
+    };
+
+    const PAYMENT_TYPE_LABELS = {
+      Visa: 'عهدة Visa',
+      Cache: 'عهدة Cash',
+      Octine: 'عهدة Octine',
+      NoCustody: 'مصروف بدون عهدة'
+    };
+
+    document.getElementById('dateFilter').value = currentDate;
+
+    document.getElementById('dateFilter').addEventListener('change', e => {
+      currentDate = e.target.value;
+      renderDay();
+    });
+
+    document.getElementById('searchInput').addEventListener('input', renderDay);
+    document.getElementById('driverFilter').addEventListener('change', renderDay);
+    document.getElementById('tripOwnerFilter').addEventListener('change', renderDay);
+
+    function isDone(t) { return t?.isDone === true || t?.IsDone === true; }
+
+    function tripIdOf(t) {
+      return t?.tripId || t?.TripId || '';
+    }
+        function canPermanentDeleteTrip(t) {
+      return t?.canBePermanentlyDeleted === true || t?.CanBePermanentlyDeleted === true;
+    }
+
+    function permanentDeleteTitle(t) {
+      const reason = t?.permanentDeleteReason || t?.PermanentDeleteReason || '';
+      return canPermanentDeleteTrip(t)
+        ? (reason || 'حذف الرحلة نهائياً بكل المصروفات والتحصيلات المرتبطة بها')
+        : (reason || 'لا يمكن حذف هذه الرحلة');
+    }
+
+    function permanentDeleteButton(t) {
+      const id = tripIdOf(t);
+      if (!id || !canPermanentDeleteTrip(t)) return '';
+      return `<button class="btn btn-danger btn-sm" title="${esc(permanentDeleteTitle(t))}" onclick="permanentDeleteTrip('${esc(id)}')">حذف الرحلة</button>`;
+    }
+
+    function currentUserId() {
+      const u = Auth.getUser() || {};
+      return u.id || u.userId || u.UserId || '';
+    }
+
+    function n(v) {
+      const x = Number(v);
+      return Number.isFinite(x) ? x : 0;
+    }
+
+    function hasMoney(v) {
+      return v !== null && v !== undefined && Number(v) > 0;
+    }
+
+    function tripCreatedBy(t) {
+      return t.adminName || t.userFullName || t.createdByName || t.createdBy || t.userName || '—';
+    }
+
+    function paymentCreatedBy(p) {
+      return p.userFullName || p.fullName || p.userName || p.createdByName || p.createdBy || p.addedByName || p.addedBy || '—';
+    }
+
+    function paymentTypeOf(p) {
+      return p.paymentType || p.PaymentType || (p.isOCtine ? PAYMENT_TYPES.Octine : '');
+    }
+
+    function normalizePaymentType(value, p) {
+      const raw = (value || p?.paymentType || p?.PaymentType || p?.paymentSource || p?.source || p?.paymentMethod || '').toString().trim().toLowerCase();
+      if (raw === 'cache' || raw === 'cash' || raw.includes('cash') || raw.includes('cache')) return PAYMENT_TYPES.Cache;
+      if (raw === 'visa' || raw.includes('visa')) return PAYMENT_TYPES.Visa;
+      if (raw === 'octine' || raw.includes('octine') || p?.isOCtine || p?.isOctine) return PAYMENT_TYPES.Octine;
+      if (raw === 'nocustody' || raw.includes('no') || raw.includes('بدون')) return PAYMENT_TYPES.NoCustody;
+      return '';
+    }
+
+    function paymentTypeLabel(p) {
+      const type = typeof p === 'string' ? normalizePaymentType(p) : normalizePaymentType(null, p);
+      return PAYMENT_TYPE_LABELS[type] || 'غير محدد';
+    }
+
+    function availablePaymentTypes(t, currentPayment) {
+      const extraType = currentPayment ? paymentTypeOf(currentPayment) : '';
+      const list = [];
+
+      if (hasMoney(t.cache) || extraType === PAYMENT_TYPES.Cache) {
+        list.push({ value: PAYMENT_TYPES.Cache, label: `${PAYMENT_TYPE_LABELS.Cache} - المتاح ${fmtMoney(t.cache || 0)}` });
+      }
+
+      if (hasMoney(t.visa) || extraType === PAYMENT_TYPES.Visa) {
+        list.push({ value: PAYMENT_TYPES.Visa, label: `${PAYMENT_TYPE_LABELS.Visa} - المتاح ${fmtMoney(t.visa || 0)}` });
+      }
+
+      if (hasMoney(t.octine) || extraType === PAYMENT_TYPES.Octine) {
+        list.push({ value: PAYMENT_TYPES.Octine, label: `${PAYMENT_TYPE_LABELS.Octine} - المتاح ${fmtMoney(t.octine || 0)}` });
+      }
+
+      if (!hasMoney(t.cache) && !hasMoney(t.visa) && !hasMoney(t.octine)) {
+        list.push({ value: PAYMENT_TYPES.NoCustody, label: PAYMENT_TYPE_LABELS.NoCustody });
+      }
+
+      return list;
+    }
+
+    function fillPaymentTypeSelect(selectId, hintId, t, selectedValue, currentPayment) {
+      const sel = document.getElementById(selectId);
+      const hint = document.getElementById(hintId);
+      const types = availablePaymentTypes(t, currentPayment);
+
+      sel.innerHTML = types.map(x => `<option value="${x.value}">${x.label}</option>`).join('');
+
+      if (selectedValue && types.some(x => x.value === selectedValue)) {
+        sel.value = selectedValue;
+      }
+
+      if (!types.length) {
+        sel.innerHTML = '<option value="">لا يوجد نوع متاح</option>';
+        hint.textContent = 'لا يمكن تسجيل مصروف لأن كل أنواع العهدة غير متاحة.';
+        return;
+      }
+
+      hint.textContent = types.some(x => x.value === PAYMENT_TYPES.NoCustody)
+        ? 'ظهر خيار بدون عهدة لأن كل أنواع العهدة لا تحتوي على رصيد.'
+        : 'يتم عرض أنواع العهدة التي تحتوي على رصيد فقط.';
+    }
+
+    function originalCustodyTotal(t) {
+      const payments = t.payments || [];
+      const spentFromCustody = payments
+        .filter(p => paymentTypeOf(p) !== PAYMENT_TYPES.NoCustody)
+        .reduce((s, p) => s + n(p.amount), 0);
+      return n(t.cache) + n(t.visa) + n(t.octine) + spentFromCustody;
+    }
+
+    function totalExpenses(t) {
+      return (t.payments || []).reduce((s, p) => s + n(p.amount), 0);
+    }
+
+    function remainingCustody(t) {
+      return n(t.cache) + n(t.visa) + n(t.octine);
+    }
+
+    function noCustodyExpenses(t) {
+      return (t.payments || []).reduce((sum, p) => {
+        const type = normalizePaymentType(null, p);
+        return type === PAYMENT_TYPES.NoCustody ? sum + n(p.amount) : sum;
+      }, 0);
+    }
+
+    function cashVisaRemaining(t) {
+      return n(t.cache) + n(t.visa);
+    }
+
+    function driverAccountTotal(t) {
+      return n(t.driverPrice) + noCustodyExpenses(t);
+    }
+
+    function adminBalanceValue(t) {
+      // موجب = لينا، سالب = علينا. Octine خارج الحسبة.
+      return cashVisaRemaining(t) - driverAccountTotal(t);
+    }
+
+    function adminBalanceForTrips(trips) {
+      return (trips || []).reduce((s, t) => s + adminBalanceValue(t), 0);
+    }
+
+    function adminBalanceLabel(amount) {
+      if (amount > 0) return 'لينا';
+      if (amount < 0) return 'علينا';
+      return 'متوازن';
+    }
+
+    function adminBalanceColor(amount) {
+      if (amount > 0) return 'var(--success)';
+      if (amount < 0) return 'var(--danger)';
+      return 'var(--text-muted)';
+    }
+
+    function adminBalanceBadge(amount) {
+      return `<span class="badge" style="background:${amount > 0 ? 'var(--success-light)' : amount < 0 ? 'var(--danger-light)' : 'var(--bg)'};color:${adminBalanceColor(amount)}">${adminBalanceLabel(amount)} ${fmtMoney(Math.abs(amount))}</span>`;
+    }
+
+
+    function esc(v) {
+      return String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function isCompanyTrip(t) {
+      return t?.isCompany === true || t?.IsCompany === true || t?.inSide === true || t?.InSide === true;
+    }
+
+    function companyNameOf(t) {
+      return (t?.companyName || t?.CompanyName || '').trim();
+    }
+
+    function notesOf(t) {
+      return (t?.notes || t?.Notes || '').trim();
+    }
+
+    function tripTypeBadge(t) {
+      if (isCompanyTrip(t)) return `<span class="badge badge-purple">شركة أخرى: ${esc(companyNameOf(t) || 'Go Bus')}</span>`;
+      return '<span class="badge badge-success">رحلة تابعة لنا</span>';
+    }
+
+    function tripSummaryHtml(t) {
+      return `
+        <div class="trip-money-grid">
+          <div class="money-box"><div class="label">سعر التشغيله</div><div class="value">${fmtMoney(t.tripPrice || 0)}</div></div>
+          <div class="money-box"><div class="label">صافي الحساب</div><div class="value" style="color:${adminBalanceColor(adminBalanceValue(t))}">${adminBalanceLabel(adminBalanceValue(t))} ${fmtMoney(Math.abs(adminBalanceValue(t)))}</div></div>
+          <div class="money-box"><div class="label">العهدة الأصلية</div><div class="value">${fmtMoney(originalCustodyTotal(t))}</div></div>
+          <div class="money-box"><div class="label">عهدة Cash المتبقية</div><div class="value">${fmtMoney(t.cache || 0)}</div></div>
+          <div class="money-box"><div class="label">عهدة Visa المتبقية</div><div class="value">${fmtMoney(t.visa || 0)}</div></div>
+          <div class="money-box"><div class="label">عهدة Octine المتبقية</div><div class="value">${fmtMoney(t.octine || 0)}</div></div>
+          <div class="money-box danger"><div class="label">إجمالي مصروفات الرحلة</div><div class="value">${fmtMoney(totalExpenses(t))}</div></div>
+          <div class="money-box success"><div class="label">المتبقي معه</div><div class="value">${fmtMoney(remainingCustody(t))}</div></div>
+        </div>`;
+    }
+
+    function compactTripSummary(t) {
+      return `
+        <div>المسار: <strong>${esc(t.fromLocation)} ← ${esc(t.toLocation)}</strong></div>
+        <div style="margin-top:4px">المتبقي: Cash ${fmtMoney(t.cache || 0)} | Visa ${fmtMoney(t.visa || 0)} | Octine ${fmtMoney(t.octine || 0)}</div>`;
+    }
+
+    async function loadAll() {
+      const [tr, dr] = await Promise.all([
+        api.get('/management/trips'),
+        api.get('/management/drivers'),
+      ]);
+
+      allTrips = tr?.data || [];
+      allDrivers = dr?.data || [];
+
+      const dSel = document.getElementById('driverFilter');
+      dSel.innerHTML = '<option value="">كل السائقين</option>';
+      allDrivers.forEach(d => {
+        const o = document.createElement('option');
+        o.value = d.driverId;
+        o.textContent = d.name;
+        dSel.appendChild(o);
+      });
+
+      renderDay();
+    }
+
+    function renderDay() {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      const dr = document.getElementById('driverFilter').value;
+      const tripOwner = document.getElementById('tripOwnerFilter').value;
+
+      const dayTrips = allTrips.filter(t => {
+        const td = t.tripDate?.slice(0, 10);
+        const matchDate = td === currentDate;
+        const matchQ = !q || t.fromLocation?.toLowerCase().includes(q) || t.toLocation?.toLowerCase().includes(q) || t.driverName?.toLowerCase().includes(q) || companyNameOf(t).toLowerCase().includes(q) || notesOf(t).toLowerCase().includes(q);
+        const matchDr = !dr || t.driverId === dr;
+        const matchOwner = !tripOwner || (tripOwner === 'company' ? isCompanyTrip(t) : !isCompanyTrip(t));
+        return matchDate && matchQ && matchDr && matchOwner;
+      });
+
+      const totalExpensesValue = dayTrips.reduce((s, t) => s + totalExpenses(t), 0);
+      const totalRemaining = dayTrips.reduce((s, t) => s + remainingCustody(t), 0);
+      const totalPayments = dayTrips.reduce((s, t) => s + (t.payments?.length || 0), 0);
+
+      document.getElementById('dayStats').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-icon amber">🗺️</div>
+          <div><div class="stat-value">${dayTrips.length}</div><div class="stat-label">الرحلات</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue">🧾</div>
+          <div><div class="stat-value">${totalPayments}</div><div class="stat-label">مصروفات الرحلة</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red">💸</div>
+          <div><div class="stat-value" style="font-size:16px">${fmtMoney(totalExpensesValue)}</div><div class="stat-label">إجمالي المصروفات</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">💰</div>
+          <div><div class="stat-value" style="font-size:16px">${fmtMoney(totalRemaining)}</div><div class="stat-label">إجمالي المتبقي</div></div>
+        </div>`;
+
+      if (!dayTrips.length) {
+        document.getElementById('tripsContainer').innerHTML = `
+          <div class="empty-state">
+            <div style="font-size:48px;margin-bottom:8px">📅</div>
+            <h3>لا توجد رحلات في هذا اليوم</h3>
+            <p>اختر تاريخاً آخر أو أضف رحلات من صفحة الرحلات</p>
+          </div>`;
+        return;
+      }
+
+      document.getElementById('tripsContainer').innerHTML = dayTrips.map(t => `
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div style="display:flex;align-items:center;gap:14px;min-width:0">
+              <div style="font-size:32px">🚌</div>
+              <div style="min-width:0">
+                <div dir="ltr" style="font-weight:600;font-size:16px;text-align:right">${esc(t.fromLocation)} ← ${esc(t.toLocation)}</div>
+                <div style="font-size:13px;color:var(--text-muted)">
+                  السائق: ${esc(t.driverName)} &nbsp;|&nbsp; ${esc(t.busName)} (${esc(t.busPalateNumber)}) &nbsp;|&nbsp; ${fmtDateTime(t.tripDate)} &nbsp;|&nbsp; أنشأها: ${esc(tripCreatedBy(t))} &nbsp;|&nbsp; ${tripTypeBadge(t)} ${isDone(t) ? '<span class="badge badge-success">✓ تم الحساب</span>' : ''}
+                </div>
+                ${notesOf(t) ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">ملاحظات: ${esc(notesOf(t))}</div>` : ''}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <div style="text-align:left">
+                <div style="font-size:18px;font-weight:700;color:var(--success)">${fmtMoney(remainingCustody(t))}</div>
+                <div style="font-size:12px;color:var(--text-muted)">المتبقي معه</div>
+              </div>
+              ${permanentDeleteButton(t)}
+              ${isDone(t) ? '<span class="badge badge-success">مغلقة - السولار فقط من صفحة الرحلات</span>' : `<button class="btn btn-primary btn-sm" onclick="openAddPayment('${t.tripId}')">+ مصروف</button>`}
+            </div>
+          </div>
+
+          ${tripSummaryHtml(t)}
+
+          ${(t.payments?.length) ? `
+          <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+            <div style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:8px">مصروفات الرحلة</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${t.payments.map(p => `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);gap:8px;flex-wrap:wrap">
+                  <div>
+                    <span style="font-weight:600;color:var(--success)">${fmtMoney(p.amount)}</span>
+                    <span class="badge badge-purple payment-type-pill">${paymentTypeLabel(p)}</span>
+                    ${p.notes ? `<span style="font-size:13px;color:var(--text-muted);margin-right:8px">${p.notes}</span>` : ''}
+                    <span class="badge badge-info" style="font-size:11px;margin-right:8px">بواسطة: ${paymentCreatedBy(p)}</span>
+                  </div>
+                  ${isDone(t) ? '<span class="badge badge-success">تم الحساب</span>' : `<div style="display:flex;gap:6px"><button class="btn btn-outline btn-xs" onclick="openEditPayment('${t.tripId}','${p.paymentId}','${p.amount}','${(p.notes || '').replace(/'/g, "\\'")}','${paymentTypeOf(p)}')">✏️</button><button class="btn btn-danger btn-xs" onclick="openDelPayment('${p.paymentId}','${p.amount}')">🗑</button></div>`}
+                </div>`).join('')}
+            </div>
+          </div>` : `
+          <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px;color:var(--text-muted);font-size:13px;text-align:center">
+            لا توجد مصروفات رحلة حتى الآن
+          </div>`}
+        </div>`).join('');
+    }
+
+    async function permanentDeleteTrip(id) {
+      const trip = allTrips.find(x => tripIdOf(x) === id);
+      if (!trip) { toast('لم يتم العثور على الرحلة', 'error'); return; }
+      if (!canPermanentDeleteTrip(trip)) { toast(permanentDeleteTitle(trip), 'error'); return; }
+
+      const message = `سيتم حذف الرحلة نهائياً بكل المصروفات والتحصيلات المرتبطة بها.\n${trip.fromLocation || trip.FromLocation || ''} ← ${trip.toLocation || trip.ToLocation || ''}\nهل أنت متأكد؟`;
+      if (!window.confirm(message)) return;
+
+      const res = await api.delete(`/management/trips/${id}/permanent`);
+      if (res?.success) {
+        toast(res.message || 'تم حذف الرحلة نهائياً');
+        await loadAll();
+      } else {
+        toast(res?.message || 'فشل حذف الرحلة', 'error');
+      }
+    }
+
+    function openAddPayment(tripId) {
+      const trip = allTrips.find(x => x.tripId === tripId);
+      if (!trip) return;
+      if (isDone(trip)) { toast('هذه الرحلة تم حسابها ولا يمكن تعديل المصروفات. المسموح فقط تعديل السولار من صفحة الرحلات.', 'error'); return; }
+
+      document.getElementById('payAmount').value = '';
+      document.getElementById('payNotes').value = '';
+      document.getElementById('payTripSummary').innerHTML = compactTripSummary(trip);
+      fillPaymentTypeSelect('payType', 'payTypeHint', trip, '', null);
+
+      document.getElementById('addPayBtn').onclick = async () => {
+        const amount = parseFloat(document.getElementById('payAmount').value);
+        const notes = document.getElementById('payNotes').value.trim();
+        const paymentType = document.getElementById('payType').value;
+
+        if (!amount || amount <= 0) { toast('أدخل مبلغاً صحيحاً', 'error'); return; }
+        if (!paymentType) { toast('اختر نوع المصروف', 'error'); return; }
+
+        document.getElementById('addPayBtn').disabled = true;
+        const res = await api.post(`/management/trips/${tripId}/payments`, {
+          amount,
+          notes,
+          userId: currentUserId(),
+          paymentType,
+          isOCtine: paymentType === PAYMENT_TYPES.Octine
+        });
+        document.getElementById('addPayBtn').disabled = false;
+
+        if (res?.success) {
+          toast('تم إضافة مصروف الرحلة');
+          closeModal('addPayModal');
+          await loadAll();
+        } else {
+          toast(res?.message || 'فشل الإضافة', 'error');
+        }
+      };
+
+      openModal('addPayModal');
+    }
+
+    function openEditPayment(tripId, paymentId, amount, notes, paymentType) {
+      const lockedTrip = allTrips.find(x => x.tripId === tripId);
+      if (isDone(lockedTrip)) { toast('هذه الرحلة تم حسابها ولا يمكن تعديل المصروفات.', 'error'); return; }
+      const trip = allTrips.find(x => x.tripId === tripId);
+      if (!trip) return;
+
+      const currentPayment = (trip.payments || []).find(p => p.paymentId === paymentId) || { paymentType };
+
+      document.getElementById('editPayAmount').value = amount;
+      document.getElementById('editPayNotes').value = notes;
+      document.getElementById('editPayTripSummary').innerHTML = compactTripSummary(trip);
+      fillPaymentTypeSelect('editPayType', 'editPayTypeHint', trip, paymentType, currentPayment);
+
+      document.getElementById('editPayBtn').onclick = async () => {
+        const newAmount = parseFloat(document.getElementById('editPayAmount').value);
+        const newNotes = document.getElementById('editPayNotes').value.trim();
+        const newPaymentType = document.getElementById('editPayType').value;
+
+        if (!newAmount || newAmount <= 0) { toast('أدخل مبلغاً صحيحاً', 'error'); return; }
+        if (!newPaymentType) { toast('اختر نوع المصروف', 'error'); return; }
+
+        document.getElementById('editPayBtn').disabled = true;
+        const res = await api.put(`/management/payments/${paymentId}`, {
+          amount: newAmount,
+          notes: newNotes,
+          userId: currentUserId(),
+          paymentType: newPaymentType,
+          isOCtine: newPaymentType === PAYMENT_TYPES.Octine
+        });
+        document.getElementById('editPayBtn').disabled = false;
+
+        if (res?.success) {
+          toast('تم تعديل مصروف الرحلة');
+          closeModal('editPayModal');
+          await loadAll();
+        } else {
+          toast(res?.message || 'فشل التعديل', 'error');
+        }
+      };
+
+      openModal('editPayModal');
+    }
+
+    function openDelPayment(paymentId, amount) {
+      document.getElementById('delPayAmt').textContent = fmtMoney(amount);
+      document.getElementById('confirmDelPay').onclick = async () => {
+        const res = await api.delete(`/management/payments/${paymentId}?userId=${currentUserId()}`);
+        if (res?.success) {
+          toast('تم حذف مصروف الرحلة');
+          closeModal('delPayModal');
+          await loadAll();
+        } else {
+          toast(res?.message || 'فشل الحذف', 'error');
+        }
+      };
+      openModal('delPayModal');
+    }
+
+    loadAll();
+  </script>
+</body>
+</html>

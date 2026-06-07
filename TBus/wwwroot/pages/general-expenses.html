@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>المصروفات العامة - UBus</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+  <div id="sidebarMount"></div>
+
+  <div class="main-wrapper">
+    <header class="header">
+      <div class="header-title">المصروفات العامة</div>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-icon" title="تغيير المظهر"></button>
+        <button class="btn btn-outline btn-sm" onclick="downloadExcel()">⬇ تنزيل Excel</button>
+        <button class="btn btn-primary" onclick="openCreate()">+ إضافة مصروف</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="stats-grid" id="statsGrid" style="margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon green">💰</div>
+          <div>
+            <div class="stat-value" id="totalAmount">0.00 ج.م</div>
+            <div class="stat-label">إجمالي المصروفات</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon purple">🧾</div>
+          <div>
+            <div class="stat-value" id="totalCount">0</div>
+            <div class="stat-label">عدد المصروفات</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="search-bar">
+        <div class="search-input-wrap">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+               viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="searchInput" placeholder="بحث بالملاحظة أو اسم المستخدم أو السائق...">
+        </div>
+        <input type="date" id="fromDate" title="من تاريخ" style="width:auto">
+        <input type="date" id="toDate" title="إلى تاريخ" style="width:auto">
+        <button class="btn btn-outline btn-sm" onclick="clearFilters()">مسح الفلاتر</button>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div id="expensesTable">
+          <div class="loader"><div class="spinner"></div><span>جاري التحميل...</span></div>
+        </div>
+        <div id="pagination" class="pagination" style="padding:12px"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create/Edit Modal -->
+  <div class="modal-overlay" id="formModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="formTitle">إضافة مصروف عام</div>
+        <button class="btn-icon" onclick="closeModal('formModal')">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>ملاحظة المصروف</label>
+            <textarea id="fNote" placeholder="مثال: صيانة مكتب، أدوات نظافة، مصروف إداري..." style="min-height:90px"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>المبلغ</label>
+            <input type="number" id="fPrice" placeholder="0.00" min="0.01" step="0.01">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="saveBtn" onclick="saveExpense()">حفظ</button>
+        <button class="btn btn-outline" onclick="closeModal('formModal')">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">تفاصيل المصروف</div>
+        <button class="btn-icon" onclick="closeModal('detailModal')">✕</button>
+      </div>
+      <div class="modal-body" id="detailBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="editFromDetail">تعديل</button>
+        <button class="btn btn-outline" onclick="closeModal('detailModal')">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Modal -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div class="modal-title text-danger">حذف مصروف عام</div>
+        <button class="btn-icon" onclick="closeModal('deleteModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>هل تريد حذف هذا المصروف؟</p>
+        <p class="text-muted mt-1" style="font-size:13px">لا يمكن التراجع عن هذا الإجراء.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="confirmDelete">حذف</button>
+        <button class="btn btn-outline" onclick="closeModal('deleteModal')">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/app.js"></script>
+  <script src="../js/xlsx-bundle.js"></script>
+  <script>
+    if (!requireAuth()) throw '';
+
+    document.getElementById('sidebarMount').innerHTML = buildSidebar('general-expenses');
+
+    let allExpenses = [];
+    let editingId = null;
+    let deletingId = null;
+    let currentPage = 1;
+    const PER_PAGE = 10;
+
+    function n(v) {
+      const x = Number(v || 0);
+      return Number.isFinite(x) ? x : 0;
+    }
+
+    function esc(v) {
+      return String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function currentUserId() {
+      const u = Auth.getUser() || {};
+      return u.id || u.userId || u.UserId || '';
+    }
+
+    function expenseIdOf(x) {
+      return x.paymentAlsoId || x.PaymentAlsoId || '';
+    }
+
+    function noteOf(x) {
+      return x.paymentAlsoNote || x.PaymentAlsoNote || '';
+    }
+
+    function priceOf(x) {
+      return x.paymentAlsoPrice ?? x.PaymentAlsoPrice ?? 0;
+    }
+
+    function createAtOf(x) {
+      return x.createAt || x.CreateAt || '';
+    }
+
+    function addedByOf(x) {
+      return (
+        x.driverName ||
+        x.DriverName ||
+        x.userFullName ||
+        x.fullName ||
+        x.FullName ||
+        x.userName ||
+        x.UserName ||
+        x.createdBy ||
+        x.CreatedBy ||
+        '—'
+      );
+    }
+
+    async function loadExpenses() {
+      document.getElementById('expensesTable').innerHTML =
+        '<div class="loader"><div class="spinner"></div><span>جاري التحميل...</span></div>';
+
+      const res = await api.get('/PaymentAlso');
+
+      if (res?.success) {
+        allExpenses = res.data || [];
+        renderStats();
+        renderTable();
+      } else {
+        allExpenses = [];
+        renderStats();
+        document.getElementById('expensesTable').innerHTML =
+          `<div class="empty-state"><p>${esc(res?.message || 'فشل تحميل المصروفات العامة')}</p></div>`;
+        toast(res?.message || 'فشل تحميل المصروفات العامة', 'error');
+      }
+    }
+
+    function getFiltered() {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      const from = document.getElementById('fromDate').value;
+      const to = document.getElementById('toDate').value;
+
+      return allExpenses.filter(x => {
+        const created = (createAtOf(x) || '').slice(0, 10);
+        const matchQ =
+          !q ||
+          noteOf(x).toLowerCase().includes(q) ||
+          addedByOf(x).toLowerCase().includes(q);
+
+        const matchFrom = !from || created >= from;
+        const matchTo = !to || created <= to;
+
+        return matchQ && matchFrom && matchTo;
+      }).sort((a, b) => new Date(createAtOf(b)) - new Date(createAtOf(a)));
+    }
+
+    function renderStats() {
+      const list = getFiltered();
+      const total = list.reduce((s, x) => s + n(priceOf(x)), 0);
+
+      document.getElementById('totalAmount').textContent = fmtMoney(total);
+      document.getElementById('totalCount').textContent = list.length;
+    }
+
+    function renderTable() {
+      const list = getFiltered();
+      const start = (currentPage - 1) * PER_PAGE;
+      const page = list.slice(start, start + PER_PAGE);
+
+      if (!allExpenses.length) {
+        document.getElementById('expensesTable').innerHTML =
+          '<div class="empty-state" style="padding:40px"><p>لا توجد مصروفات عامة</p></div>';
+        document.getElementById('pagination').innerHTML = '';
+        return;
+      }
+
+      const rows = page.length ? page.map(x => {
+        const id = expenseIdOf(x);
+        return `
+          <tr>
+            <td>
+              <div style="font-weight:600;max-width:420px;white-space:normal;line-height:1.6">${esc(noteOf(x) || '—')}</div>
+            </td>
+            <td><strong class="text-danger">${fmtMoney(priceOf(x))}</strong></td>
+            <td><span class="badge badge-info">${esc(addedByOf(x))}</span></td>
+            <td>${fmtDateTime(createAtOf(x))}</td>
+            <td>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-outline btn-xs" onclick="showDetail('${esc(id)}')">👁 عرض</button>
+                <button class="btn btn-outline btn-xs" onclick="openEdit('${esc(id)}')">✏️ تعديل</button>
+                <button class="btn btn-danger btn-xs" onclick="openDelete('${esc(id)}')">🗑 حذف</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join('') :
+      `<tr><td colspan="5"><div class="empty-state"><p>لا توجد نتائج مطابقة</p></div></td></tr>`;
+
+      document.getElementById('expensesTable').innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>الملاحظة</th>
+              <th>المبلغ</th>
+              <th>تمت بواسطة</th>
+              <th>تاريخ الإضافة</th>
+              <th>الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+
+      buildPagination(
+        document.getElementById('pagination'),
+        list.length,
+        currentPage,
+        PER_PAGE,
+        p => { currentPage = p; renderTable(); }
+      );
+    }
+
+    function clearFilters() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('fromDate').value = '';
+      document.getElementById('toDate').value = '';
+      currentPage = 1;
+      renderStats();
+      renderTable();
+    }
+
+    function openCreate() {
+      editingId = null;
+      document.getElementById('formTitle').textContent = 'إضافة مصروف عام';
+      document.getElementById('fNote').value = '';
+      document.getElementById('fPrice').value = '';
+      openModal('formModal');
+    }
+
+    function openEdit(id) {
+      const x = allExpenses.find(e => expenseIdOf(e) === id);
+      if (!x) return;
+
+      editingId = id;
+      document.getElementById('formTitle').textContent = 'تعديل مصروف عام';
+      document.getElementById('fNote').value = noteOf(x);
+      document.getElementById('fPrice').value = priceOf(x);
+
+      closeModal('detailModal');
+      openModal('formModal');
+    }
+
+    async function saveExpense() {
+      const note = document.getElementById('fNote').value.trim();
+      const price = Number(document.getElementById('fPrice').value);
+
+      if (!note) {
+        toast('اكتب ملاحظة المصروف', 'error');
+        return;
+      }
+
+      if (!Number.isFinite(price) || price <= 0) {
+        toast('أدخل مبلغ صحيح أكبر من صفر', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      btn.textContent = 'جاري الحفظ...';
+
+      const payload = {
+        paymentAlsoNote: note,
+        paymentAlsoPrice: price,
+        userId: currentUserId()
+      };
+
+      const res = editingId
+        ? await api.put(`/PaymentAlso/${editingId}`, payload)
+        : await api.post('/PaymentAlso', payload);
+
+      btn.disabled = false;
+      btn.textContent = 'حفظ';
+
+      if (res?.success) {
+        toast(editingId ? 'تم تعديل المصروف' : 'تم إضافة المصروف');
+        closeModal('formModal');
+        await loadExpenses();
+      } else {
+        toast(res?.message || 'فشل الحفظ', 'error');
+      }
+    }
+
+    function showDetail(id) {
+      const x = allExpenses.find(e => expenseIdOf(e) === id);
+      if (!x) return;
+
+      document.getElementById('detailBody').innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>المبلغ</label>
+            <div class="detail-value text-danger">${fmtMoney(priceOf(x))}</div>
+          </div>
+          <div class="detail-item">
+            <label>تمت بواسطة</label>
+            <div class="detail-value">${esc(addedByOf(x))}</div>
+          </div>
+          <div class="detail-item">
+            <label>تاريخ الإضافة</label>
+            <div class="detail-value">${fmtDateTime(createAtOf(x))}</div>
+          </div>
+          <div class="detail-item" style="grid-column:1/-1">
+            <label>الملاحظة</label>
+            <div class="detail-value" style="white-space:pre-wrap;line-height:1.7">${esc(noteOf(x) || '—')}</div>
+          </div>
+        </div>`;
+
+      document.getElementById('editFromDetail').onclick = () => openEdit(id);
+      openModal('detailModal');
+    }
+
+    function openDelete(id) {
+      deletingId = id;
+      openModal('deleteModal');
+    }
+
+    document.getElementById('confirmDelete').onclick = async () => {
+      if (!deletingId) return;
+
+      const btn = document.getElementById('confirmDelete');
+      btn.disabled = true;
+      btn.textContent = 'جاري الحذف...';
+
+      const res = await api.delete(`/PaymentAlso/${deletingId}?userId=${currentUserId()}`);
+
+      btn.disabled = false;
+      btn.textContent = 'حذف';
+
+      if (res?.success) {
+        toast('تم حذف المصروف');
+        closeModal('deleteModal');
+        deletingId = null;
+        await loadExpenses();
+      } else {
+        toast(res?.message || 'فشل الحذف', 'error');
+      }
+    };
+
+    function downloadExcel() {
+      const list = getFiltered();
+
+      const rows = list.map(x => ({
+        'الملاحظة': noteOf(x),
+        'المبلغ': n(priceOf(x)),
+        'تمت بواسطة': addedByOf(x),
+        'تاريخ الإضافة': fmtDateTime(createAtOf(x))
+      }));
+
+      if (typeof XLSX === 'undefined') {
+        let csv = 'الملاحظة,المبلغ,تمت بواسطة,تاريخ الإضافة\n';
+        rows.forEach(r => {
+          csv += `"${String(r['الملاحظة']).replace(/"/g, '""')}",`;
+          csv += `"${r['المبلغ']}",`;
+          csv += `"${String(r['تمت بواسطة']).replace(/"/g, '""')}",`;
+          csv += `"${r['تاريخ الإضافة']}"\n`;
+        });
+
+        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `general-expenses-${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 45 },
+        { wch: 15 },
+        { wch: 24 },
+        { wch: 22 }
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, 'المصروفات العامة');
+      XLSX.writeFile(wb, `general-expenses-${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    document.getElementById('searchInput').addEventListener('input', () => {
+      currentPage = 1;
+      renderStats();
+      renderTable();
+    });
+
+    document.getElementById('fromDate').addEventListener('change', () => {
+      currentPage = 1;
+      renderStats();
+      renderTable();
+    });
+
+    document.getElementById('toDate').addEventListener('change', () => {
+      currentPage = 1;
+      renderStats();
+      renderTable();
+    });
+
+    loadExpenses();
+  </script>
+</body>
+</html>

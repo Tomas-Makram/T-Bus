@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>تسجيل الدخول - UBus</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    /* ── Reset body for login page ── */
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+    }
+
+    /* ── Full-screen centered wrapper — override sidebar layout ── */
+    .login-page {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      min-height: 100vh;
+      width: 100%;
+      background: var(--bg);
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    /* ── Card ── */
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px 32px 32px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+
+    /* ── Logo block ── */
+    .login-logo { text-align: center; margin-bottom: 28px; }
+
+    .logo-icon {
+      width: 64px; height: 64px;
+      background: var(--primary);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 14px;
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(79,70,229,0.35);
+    }
+
+    .login-logo h2 {
+      font-size: 24px; font-weight: 700;
+      color: var(--text); margin: 0 0 4px;
+    }
+
+    .login-logo p {
+      font-size: 14px; color: var(--text-muted); margin: 0;
+    }
+
+    /* ── Input with icons ── */
+    .input-icon { position: relative; }
+
+    .input-icon .i-start {
+      position: absolute; right: 11px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 15px; pointer-events: none;
+      color: var(--text-muted);
+    }
+
+    .input-icon input { padding-right: 34px; }
+
+    .toggle-pass {
+      position: absolute; left: 10px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      font-size: 16px; color: var(--text-muted);
+      line-height: 1;
+    }
+    .toggle-pass:hover { color: var(--primary); }
+
+    /* ── Error message ── */
+    .error-msg {
+      color: var(--danger); font-size: 13px;
+      margin-top: 6px; display: none;
+      padding: 8px 12px;
+      background: var(--danger-light);
+      border-radius: 6px;
+    }
+
+    /* ── Theme toggle row ── */
+    .theme-row {
+      display: flex; justify-content: flex-end;
+      margin-bottom: 20px;
+    }
+
+    /* ── Divider ── */
+    .login-divider {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 20px 0 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+
+  <div class="login-page">
+    <div class="login-card">
+
+      <!-- Logo -->
+      <div class="login-logo">
+        <div class="logo-icon">
+          <svg width="34" height="34" fill="none" stroke="currentColor"
+               stroke-width="2" viewBox="0 0 24 24">
+            <rect x="1" y="3" width="22" height="16" rx="2"/>
+            <path d="M1 12h22M7 19v2M17 19v2"/>
+            <circle cx="6"  cy="15" r="1.5" fill="currentColor"/>
+            <circle cx="18" cy="15" r="1.5" fill="currentColor"/>
+          </svg>
+        </div>
+        <h2>UBus</h2>
+        <p>نظام إدارة الحافلات والرحلات</p>
+      </div>
+
+      <!-- Theme toggle -->
+      <div class="theme-row">
+        <button id="themeToggle" class="btn-icon" title="تغيير المظهر"></button>
+      </div>
+
+      <!-- Form -->
+      <form id="loginForm" novalidate>
+
+        <div class="form-group" style="margin-bottom:16px">
+          <label>اسم المستخدم / رقم الهاتف / الرقم القومي</label>
+          <div class="input-icon">
+            <span class="i-start">👤</span>
+            <input type="text" id="username"
+                   placeholder="أدخل بيانات الدخول"
+                   autocomplete="username" required>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:8px">
+          <label>كلمة المرور</label>
+          <div class="input-icon">
+            <span class="i-start">🔒</span>
+            <input type="password" id="password"
+                   placeholder="كلمة المرور"
+                   autocomplete="current-password" required>
+            <button type="button" class="toggle-pass"
+                    id="togglePass" title="إظهار/إخفاء">👁</button>
+          </div>
+        </div>
+
+        <span class="error-msg" id="loginError"></span>
+
+        <button type="submit" class="btn btn-primary w-full"
+                id="submitBtn"
+                style="justify-content:center;font-size:15px;padding:13px;margin-top:20px;
+                       border-radius:10px;font-weight:600;letter-spacing:0.02em">
+          تسجيل الدخول
+        </button>
+
+      </form>
+
+                  <div class="login-divider">UBus © 2025</div>
+
+      <div class="login-developer-box">
+        <div class="login-developer-icon">👨‍💻</div>
+        <div class="login-developer-title">Developer</div>
+        <div class="login-developer-name">Tomas Makram</div>
+
+        <div class="login-developer-contact">
+          <a href="tel:01221936850" class="login-dev-chip phone">
+            📞 01221936850
+          </a>
+
+          <a href="https://wa.me/201221936850" target="_blank" class="login-dev-chip whatsapp">
+            WhatsApp
+          </a>
+
+          <a href="mailto:Tomasmakram86627@gmail.com" class="login-dev-chip email">
+            Email
+          </a>
+        </div>
+      </div>
+<!--<div class="login-developer-name">Tomas Makram</div>
+        <div class="login-developer-links">
+          <a href="tel:01221936850">📞 01221936850</a>
+          <span>•</span>
+          <a target="_blank" href="https://wa.me/201221936850">WhatsApp</a>
+          <span>•</span>
+          <a href="mailto:Tomasmakram86627@gmail.com">Email</a>
+        </div>
+</div>
+  </div>-->
+
+  <script src="../js/app.js"></script>
+  <script>
+    if (Auth.isLoggedIn()) {
+      resolveRole().then(role => {
+        window.location.href = role === 'Driver'
+          ? '/pages/driver-home.html'
+          : '/pages/dashboard.html';
+      });
+    }
+
+    document.getElementById('togglePass').addEventListener('click', () => {
+      const inp = document.getElementById('password');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', async e => {
+      e.preventDefault();
+
+      const btn   = document.getElementById('submitBtn');
+      const errEl = document.getElementById('loginError');
+      errEl.style.display = 'none';
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!username || !password) {
+        errEl.textContent = 'يرجى تعبئة جميع الحقول';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'جاري تسجيل الدخول...';
+
+      try {
+        const res = await fetch('/api/v1/authenticate/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            emailOrPhoneOrUsernameOrNationalId: username,
+            password,
+          }),
+        });
+        const data = await res.json();
+
+        if (data.success && data.data) {
+          Auth.save(data.data);
+          toast('مرحباً بك! 👋', 'success');
+          const role = await resolveRole();
+          setTimeout(() => {
+            window.location.href = role === 'Driver'
+              ? '/pages/driver-home.html'
+              : '/pages/dashboard.html';
+          }, 600);
+        } else {
+          errEl.textContent = data.message || 'بيانات الدخول غير صحيحة';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'تسجيل الدخول';
+        }
+      } catch {
+        errEl.textContent = 'تعذّر الاتصال بالخادم';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'تسجيل الدخول';
+      }
+    });
+  </script>
+</body>
+</html>

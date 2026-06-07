@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>الحافلات - UBus</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+  <div id="sidebarMount"></div>
+
+  <div class="main-wrapper">
+    <header class="header">
+      <div class="header-title">إدارة الحافلات</div>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-icon" title="تغيير المظهر"></button>
+        <button class="btn btn-primary" onclick="openCreate()">+ إضافة حافلة</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="search-bar">
+        <div class="search-input-wrap">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="searchInput" placeholder="بحث بالاسم أو رقم اللوحة...">
+        </div>
+        <select id="filterSort" style="width:auto;padding:9px 12px">
+          <option value="">الأحدث</option>
+          <option value="name">الاسم</option>
+          <option value="plate">اللوحة</option>
+        </select>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div id="busesTable"><div class="loader"><div class="spinner"></div><span>جاري التحميل...</span></div></div>
+        <div id="pagination" class="pagination" style="padding:12px"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Form Modal -->
+  <div class="modal-overlay" id="formModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="formTitle">إضافة حافلة</div>
+        <button class="btn-icon" onclick="closeModal('formModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>اسم الحافلة</label>
+            <input type="text" id="fName" placeholder="مثال: حافلة القاهرة 1">
+          </div>
+          <div class="form-group">
+            <label>رقم اللوحة</label>
+            <input type="text" id="fPlate" placeholder="مثال: أ ب ج 1234">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="saveBtn" onclick="saveBus()">حفظ</button>
+        <button class="btn btn-outline" onclick="closeModal('formModal')">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">تفاصيل الحافلة</div>
+        <button class="btn-icon" onclick="closeModal('detailModal')">✕</button>
+      </div>
+      <div class="modal-body" id="detailBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="editFromDetail">تعديل</button>
+        <button class="btn btn-outline" onclick="closeModal('detailModal')">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Modal -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div class="modal-title text-danger">حذف الحافلة</div>
+        <button class="btn-icon" onclick="closeModal('deleteModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>هل تريد حذف الحافلة <strong id="deleteBusName"></strong>؟</p>
+        <p class="text-muted mt-1" style="font-size:13px">لا يمكن التراجع عن هذا الإجراء.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="confirmDelete">حذف</button>
+        <button class="btn btn-outline" onclick="closeModal('deleteModal')">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/app.js"></script>
+  <script>
+    if (!requireAuth()) throw '';
+    document.getElementById('sidebarMount').innerHTML = buildSidebar('buses');
+
+    let allBuses = [];
+    let editingId = null;
+    let currentPage = 1;
+    const PER_PAGE = 10;
+
+    async function loadBuses() {
+      const res = await api.get('/management/buses');
+      if (res?.success) { allBuses = res.data || []; renderTable(); }
+      else toast(res?.message || 'فشل التحميل', 'error');
+    }
+
+    function getFiltered() {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+      const s = document.getElementById('filterSort').value;
+      let list = allBuses.filter(b =>
+        !q || b.name?.toLowerCase().includes(q) || b.palateNumber?.toLowerCase().includes(q)
+      );
+      if (s === 'name')  list.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+      if (s === 'plate') list.sort((a, b) => a.palateNumber.localeCompare(b.palateNumber));
+      else if (!s) list.sort((a, b) => new Date(b.createAt) - new Date(a.createAt));
+      return list;
+    }
+
+    function renderTable() {
+      const list  = getFiltered();
+      const start = (currentPage - 1) * PER_PAGE;
+      const page  = list.slice(start, start + PER_PAGE);
+
+      const rows = page.length ? page.map(b => `
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:38px;height:38px;border-radius:8px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:20px">🚌</div>
+              <strong>${b.name}</strong>
+            </div>
+          </td>
+          <td><span class="badge badge-purple">${b.palateNumber}</span></td>
+          <td>${fmtDate(b.createAt)}</td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline btn-xs" onclick="showDetail('${b.busId}')">👁 عرض</button>
+              <button class="btn btn-outline btn-xs" onclick="openEdit('${b.busId}')">✏️ تعديل</button>
+              <button class="btn btn-danger btn-xs" onclick="openDelete('${b.busId}','${b.name.replace(/'/g,"\\'")}')">🗑 حذف</button>
+            </div>
+          </td>
+        </tr>`).join('') :
+        `<tr><td colspan="4"><div class="empty-state"><p>لا توجد نتائج</p></div></td></tr>`;
+
+      document.getElementById('busesTable').innerHTML = `
+        <table>
+          <thead><tr><th>الاسم</th><th>رقم اللوحة</th><th>تاريخ الإضافة</th><th>الإجراءات</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+
+      buildPagination(
+        document.getElementById('pagination'),
+        list.length, currentPage, PER_PAGE,
+        p => { currentPage = p; renderTable(); }
+      );
+    }
+
+    document.getElementById('searchInput').addEventListener('input', () => { currentPage = 1; renderTable(); });
+    document.getElementById('filterSort').addEventListener('change', () => { currentPage = 1; renderTable(); });
+
+    function openCreate() {
+      editingId = null;
+      document.getElementById('fName').value = '';
+      document.getElementById('fPlate').value = '';
+      document.getElementById('formTitle').textContent = 'إضافة حافلة جديدة';
+      document.getElementById('saveBtn').textContent = 'إضافة';
+      openModal('formModal');
+    }
+
+    function openEdit(id) {
+      const b = allBuses.find(x => x.busId === id);
+      if (!b) return;
+      editingId = id;
+      document.getElementById('fName').value  = b.name;
+      document.getElementById('fPlate').value = b.palateNumber;
+      document.getElementById('formTitle').textContent = 'تعديل بيانات الحافلة';
+      document.getElementById('saveBtn').textContent = 'حفظ التعديلات';
+      openModal('formModal');
+    }
+
+    async function saveBus() {
+      const name = document.getElementById('fName').value.trim();
+      const palateNumber = document.getElementById('fPlate').value.trim();
+      if (!name)         { toast('الاسم مطلوب', 'error'); return; }
+      if (!palateNumber) { toast('رقم اللوحة مطلوب', 'error'); return; }
+
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      const body = { name, palateNumber };
+      const res = editingId
+        ? await api.put(`/management/buses/${editingId}`, body)
+        : await api.post('/management/buses', body);
+      btn.disabled = false;
+
+      if (res?.success) {
+        toast(editingId ? 'تم تعديل الحافلة' : 'تم إضافة الحافلة بنجاح');
+        closeModal('formModal');
+        await loadBuses();
+      } else {
+        toast(res?.message || 'فشل الحفظ', 'error');
+      }
+    }
+
+    function showDetail(id) {
+      const b = allBuses.find(x => x.busId === id);
+      if (!b) return;
+      document.getElementById('detailBody').innerHTML = `
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:56px">🚌</div>
+          <h3 style="font-size:20px;margin-top:8px">${b.name}</h3>
+          <span class="badge badge-purple" style="font-size:14px;padding:6px 16px">${b.palateNumber}</span>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>تاريخ الإضافة</label>
+            <div class="detail-value">${fmtDateTime(b.createAt)}</div>
+          </div>
+          <div class="detail-item">
+            <label>المعرف</label>
+            <div class="detail-value" style="font-size:12px;font-family:monospace">${b.busId}</div>
+          </div>
+        </div>`;
+      document.getElementById('editFromDetail').onclick = () => { closeModal('detailModal'); openEdit(id); };
+      openModal('detailModal');
+    }
+
+    function openDelete(id, name) {
+      document.getElementById('deleteBusName').textContent = name;
+      document.getElementById('confirmDelete').onclick = async () => {
+        const res = await api.delete(`/management/buses/${id}`);
+        if (res?.success) {
+          toast('تم حذف الحافلة');
+          closeModal('deleteModal');
+          await loadBuses();
+        } else {
+          toast(res?.message || 'فشل الحذف', 'error');
+        }
+      };
+      openModal('deleteModal');
+    }
+
+    loadBuses();
+  </script>
+</body>
+</html>

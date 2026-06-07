@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>لوحة التحكم - UBus</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+  <div id="sidebarMount"></div>
+
+  <div class="main-wrapper">
+    <header class="header">
+      <div class="header-title">لوحة التحكم</div>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-icon" title="تغيير المظهر"></button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="spinner" style="margin:auto"></div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🗺️ آخر الرحلات</div>
+            <a href="trips.html" class="btn btn-outline btn-sm">عرض الكل</a>
+          </div>
+          <div id="recentTrips"><div class="loader"><div class="spinner"></div></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📅 رحلات اليوم</div>
+            <a href="daily-trips.html" class="btn btn-outline btn-sm">عرض الكل</a>
+          </div>
+          <div id="todayTrips"><div class="loader"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/app.js"></script>
+  <script>
+    if (!requireAuth()) throw '';
+
+    document.getElementById('sidebarMount').innerHTML = buildSidebar('dashboard');
+
+
+    
+
+    function numOrNull(id) {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const v = el.value;
+      return v === '' || v === null ? null : parseFloat(v);
+    }
+
+    function sourceLabel(src) {
+      if (src === 'visa') return 'عهدة Visa';
+      if (src === 'cache') return 'عهدة Cash';
+      if (src === 'octine') return 'عهدة Octine';
+      return 'عهدة';
+    }
+
+    function paymentSourceFromPayment(p) {
+      const raw = (p.paymentSource || p.source || p.paymentMethod || '').toString().toLowerCase();
+      if (raw.includes('visa')) return 'visa';
+      if (raw.includes('cache') || raw.includes('cash')) return 'cache';
+      if (raw.includes('octine') || p.isOCtine || p.isOctine) return 'octine';
+      return '';
+    }
+
+    function availableSourcesForTrip(t) {
+      const sources = [];
+      if (t && t.visa !== null && t.visa !== undefined) sources.push({ value: 'visa', label: `عهدة Visa (${fmtMoney(t.visa)})` });
+      if (t && t.cache !== null && t.cache !== undefined) sources.push({ value: 'cache', label: `عهدة Cash (${fmtMoney(t.cache)})` });
+      if (t && t.octine !== null && t.octine !== undefined) sources.push({ value: 'octine', label: `عهدة Octine (${fmtMoney(t.octine)})` });
+      return sources;
+    }
+
+    function availableSourcesFromForm() {
+      const t = { visa: numOrNull('fVisa'), cache: numOrNull('fCache'), octine: numOrNull('fOctine') };
+      return availableSourcesForTrip(t);
+    }
+
+    function renderPaymentSourceOptions(sources, selected) {
+      if (!sources.length) return '<option value="">لا توجد عهدة متاحة</option>';
+      return sources.map(s => `<option value="${s.value}" ${selected === s.value ? 'selected' : ''}>${s.label}</option>`).join('');
+    }
+
+    function paymentSourceBadge(p) {
+      const src = paymentSourceFromPayment(p);
+      return src ? `<span class="badge badge-purple" style="font-size:11px;margin-right:8px">${sourceLabel(src)}</span>` : '';
+    }
+
+    function esc(v) {
+      return String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function isCompanyTrip(t) {
+      return t?.isCompany === true || t?.IsCompany === true || t?.inSide === true || t?.InSide === true;
+    }
+
+    function companyNameOf(t) {
+      return (t?.companyName || t?.CompanyName || '').trim();
+    }
+
+    function notesOf(t) {
+      return (t?.notes || t?.Notes || '').trim();
+    }
+
+    function tripTypeBadge(t) {
+      if (isCompanyTrip(t)) return `<span class="badge badge-purple">شركة أخرى: ${esc(companyNameOf(t) || 'Go Bus')}</span>`;
+      return '<span class="badge badge-success">رحلة تابعة لنا</span>';
+    }
+
+    function currentUserId() {
+      const u = Auth.getUser() || {};
+      return u.id || u.userId || u.UserId || '';
+    }
+
+    function tripCreatedBy(t) {
+      return t.adminName || t.userFullName || t.createdByName || t.createdBy || t.userName || '—';
+    }
+
+    function paymentCreatedBy(p) {
+      return p.userFullName || p.fullName || p.userName || p.createdByName || p.createdBy || p.addedByName || p.addedBy || '—';
+    }
+
+    async function loadDashboard() {
+      const [buses, drivers, trips] = await Promise.all([
+        api.get('/management/buses'),
+        api.get('/management/drivers'),
+        api.get('/management/trips'),
+      ]);
+
+      const bList = buses?.data || [];
+      const dList = drivers?.data || [];
+      const tList = trips?.data || [];
+
+      const today = new Date().toDateString();
+      const todayCount = tList.filter(t => new Date(t.tripDate).toDateString() === today).length;
+      const totalIncome = tList.reduce((s, t) => s + (t.totalPayments || 0), 0);
+
+      document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-icon purple">🚌</div>
+          <div>
+            <div class="stat-value">${bList.length}</div>
+            <div class="stat-label">الحافلات</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue">👤</div>
+          <div>
+            <div class="stat-value">${dList.length}</div>
+            <div class="stat-label">السائقون</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber">🗺️</div>
+          <div>
+            <div class="stat-value">${tList.length}</div>
+            <div class="stat-label">إجمالي الرحلات</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">📅</div>
+          <div>
+            <div class="stat-value">${todayCount}</div>
+            <div class="stat-label">رحلات اليوم</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red">💰</div>
+          <div>
+            <div class="stat-value" style="font-size:16px">${fmtMoney(totalIncome)}</div>
+            <div class="stat-label">إجمالي المصروفات</div>
+          </div>
+        </div>
+      `;
+
+      // Recent 5 trips
+      const recent = [...tList].sort((a, b) => new Date(b.tripDate) - new Date(a.tripDate)).slice(0, 5);
+      document.getElementById('recentTrips').innerHTML = recent.length ? `
+        <table><thead><tr>
+          <th>التاريخ</th><th>المسار</th><th>نوع الرحلة</th><th>السائق</th><th>أنشأها</th><th>المصروفات</th>
+        </tr></thead><tbody>
+          ${recent.map(t => `<tr>
+            <td>${fmtDate(t.tripDate)}</td>
+            <td><div dir="ltr" style="text-align:right">${esc(t.fromLocation)} ← ${esc(t.toLocation)}</div>${notesOf(t) ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${esc(notesOf(t))}</div>` : ''}</td>
+            <td>${tripTypeBadge(t)}</td>
+            <td>${esc(t.driverName)}</td>
+            <td>${esc(tripCreatedBy(t))}</td>
+            <td class="text-success">${fmtMoney(t.totalPayments)}</td>
+          </tr>`).join('')}
+        </tbody></table>` : `<div class="empty-state"><p>لا توجد رحلات بعد</p></div>`;
+
+      // Today's trips
+      const todayList = tList.filter(t => new Date(t.tripDate).toDateString() === today).slice(0, 5);
+      document.getElementById('todayTrips').innerHTML = todayList.length ? `
+        <table><thead><tr>
+          <th>السائق</th><th>الحافلة</th><th>المسار</th><th>نوع الرحلة</th><th>مصروفات الرحلة</th>
+        </tr></thead><tbody>
+          ${todayList.map(t => `<tr>
+            <td>${esc(t.driverName)}</td>
+            <td>${esc(t.busName)}</td>
+            <td><div dir="ltr" style="text-align:right">${esc(t.fromLocation)} ← ${esc(t.toLocation)}</div>${notesOf(t) ? `<div style="font-size:12px;color:var(--text-muted);margin-top:3px">${esc(notesOf(t))}</div>` : ''}</td>
+            <td>${tripTypeBadge(t)}</td>
+            <td><span class="badge badge-info">${t.payments?.length || 0}</span></td>
+          </tr>`).join('')}
+        </tbody></table>` : `<div class="empty-state"><p>لا توجد رحلات اليوم</p></div>`;
+    }
+
+    loadDashboard().catch(e => toast('خطأ في تحميل البيانات', 'error'));
+  </script>
+</body>
+</html>

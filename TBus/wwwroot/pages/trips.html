@@ -1,0 +1,130 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>الرحلات - UBus</title><link rel="stylesheet" href="../css/style.css"></head><body><div id="toastContainer" class="toast-container"></div><div id="sidebarMount"></div><div class="main-wrapper"><header class="header"><div class="header-title">إدارة الرحلات</div><div class="header-actions"><button id="themeToggle" class="btn-icon"></button><button class="btn btn-primary" onclick="openCreate()">+ إضافة رحلة</button></div></header><main class="page-content"><div class="search-bar"><div class="search-input-wrap"><input id="q" placeholder="بحث بالمسار أو السائق أو الحافلة" oninput="render()"></div><input type="date" id="dateFilter" onchange="render()"><select id="driverFilter" onchange="render()"><option value="">كل السائقين</option></select><select id="ownerFilter" onchange="render()"><option value="">كل الرحلات</option><option value="mine">رحلات Go Bus</option><option value="company">شركات أخرى</option></select></div><div id="tripsBox"><div class="loader"><div class="spinner"></div></div></div></main></div>
+<div class="modal-overlay" id="formModal"><div class="modal modal-lg"><div class="modal-header"><div class="modal-title" id="formTitle">إضافة رحلة</div><button class="btn-icon" onclick="closeModal('formModal')">✕</button></div><div class="modal-body"><input type="hidden" id="editId"><div class="form-grid"><div class="form-group"><label>الحافلة</label><select id="fBusId"></select></div><div class="form-group"><label>السائق</label><select id="fDriverId"></select></div><div class="form-group"><label>التاريخ والوقت</label><input type="datetime-local" id="fDate"></div><div class="form-group"><label>من</label><input id="fFrom"></div><div class="form-group"><label>إلى</label><input id="fTo"></div><div class="form-group"><label>سعر التشغيله</label><input type="number" id="fTripPrice" min="0" step="0.01"></div><div class="form-group"><label>كومسيون السائق</label><input type="number" id="fDriverPrice" min="0" step="0.01"></div><div class="form-group"><label>عهدة</label><input type="number" id="fCache" min="0" step="0.01" placeholder="العهدة فقط"></div><div class="form-group"><label>سولار</label><input type="number" id="fSolar" min="0" step="0.01" placeholder="السعر المدفوع في السولار"></div><div class="form-group"><label>نوع الرحلة</label><select id="fIsCompany" onchange="toggleCompany()"><option value="false">رحلات Go Bus</option><option value="true">شركة أخرى</option></select></div><div class="form-group" id="companyGroup" style="display:none"><label>اسم الشركة</label><input id="fCompanyName"></div><div class="form-group full"><label>ملاحظات</label><textarea id="fNotes"></textarea></div></div><div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px"><b>مصروفات مبدئية</b><button class="btn btn-outline btn-sm" onclick="addPayLine()" style="margin-right:8px">+ مصروف</button><div id="payLines" style="margin-top:10px"></div></div><div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px"><b>تحصيلات مبدئية</b><button class="btn btn-outline btn-sm" onclick="addTahLine()" style="margin-right:8px">+ تحصيل</button><div id="tahLines" style="margin-top:10px"></div></div></div><div class="modal-footer"><button class="btn btn-primary" onclick="saveTrip()">حفظ</button><button class="btn btn-outline" onclick="closeModal('formModal')">إلغاء</button></div></div></div>
+<div class="modal-overlay" id="detailModal"><div class="modal modal-lg"><div class="modal-header"><div class="modal-title">تفاصيل الرحلة</div><button class="btn-icon" onclick="closeModal('detailModal')">✕</button></div><div class="modal-body" id="detailBody"></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('detailModal')">إغلاق</button></div></div></div>
+<div class="modal-overlay" id="payModal"><div class="modal modal-sm"><div class="modal-header"><div class="modal-title" id="payTitle">إضافة مصروف</div><button class="btn-icon" onclick="closeModal('payModal')">✕</button></div><div class="modal-body"><input type="hidden" id="payTripId"><input type="hidden" id="payId"><div class="form-group"><label>المبلغ</label><input type="number" id="payAmount" min="0" step="0.01"></div><div class="form-group"><label>ملاحظات</label><textarea id="payNotes"></textarea></div></div><div class="modal-footer"><button class="btn btn-primary" onclick="savePayment()">حفظ</button><button class="btn btn-outline" onclick="closeModal('payModal')">إلغاء</button></div></div></div>
+<div class="modal-overlay" id="tahModal"><div class="modal modal-sm"><div class="modal-header"><div class="modal-title" id="tahTitle">إضافة تحصيل</div><button class="btn-icon" onclick="closeModal('tahModal')">✕</button></div><div class="modal-body"><input type="hidden" id="tahTripId"><input type="hidden" id="tahId"><div class="form-group"><label>قيمة التحصيل</label><input type="number" id="tahAmount" min="0" step="0.01"></div><div class="form-group"><label>ملاحظات التحصيل</label><textarea id="tahNotes"></textarea></div></div><div class="modal-footer"><button class="btn btn-primary" onclick="saveTahseel()">حفظ</button><button class="btn btn-outline" onclick="closeModal('tahModal')">إلغاء</button></div></div></div>
+
+<div class="modal-overlay" id="solarModal"><div class="modal modal-sm"><div class="modal-header"><div class="modal-title">تعديل سعر السولار</div><button class="btn-icon" onclick="closeModal('solarModal')">✕</button></div><div class="modal-body"><input type="hidden" id="solarTripId"><div class="form-group"><label>سعر السولار</label><input type="number" id="solarAmount" min="0" step="0.01" placeholder="0.00"></div><div id="solarTripInfo" class="muted" style="margin-top:8px"></div></div><div class="modal-footer"><button class="btn btn-primary" onclick="saveSolar()">حفظ السولار</button><button class="btn btn-outline" onclick="closeModal('solarModal')">إلغاء</button></div></div></div>
+<script src="../js/app.js"></script><script>
+
+    // تنسيق المبالغ بدون فواصل وبدون أصفار عشرية مزعجة
+    function fmtMoney(value) {
+      const x = Number(value || 0);
+      if (!Number.isFinite(x)) return '0 ج.م';
+      const rounded = Math.round(x * 100) / 100;
+      const text = Number.isInteger(rounded)
+        ? String(rounded)
+        : String(rounded).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+      return `${text} ج.م`;
+    }
+
+    const n=v=>{const x=Number(v||0);return Number.isFinite(x)?x:0};
+    const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    const uid=()=>{const u=Auth.getUser()||{};return u.id||u.userId||u.UserId||''};
+    const idOf=(x,...ks)=>ks.map(k=>x?.[k]).find(v=>v!==undefined&&v!==null) || '';
+    const paymentsOf=t=>t?.payments||t?.Payments||[];
+    const tahseelOf=t=>t?.tahseelItems||t?.TahseelItems||t?.tahseels||t?.Tahseels||[];
+    const money=(v)=>{
+      const x=n(v);
+      const rounded=Math.round((x+Number.EPSILON)*100)/100;
+      const s=Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/\.?0+$/,'');
+      return `${s} ج.م`;
+    };
+    const totalPayments=t=> n(t?.totalPayments ?? paymentsOf(t).reduce((s,p)=>s+n(p.amount??p.Amount),0));
+    const totalTahseel=t=> n(t?.totalTahseel ?? t?.TotalTahseel ?? tahseelOf(t).reduce((s,x)=>s+n(x.amount??x.Amount),0));
+    const custody=t=> n(t?.cache ?? t?.Cache);
+    const solar=t=> n(t?.solar ?? t?.Solar);
+    const driverPrice=t=> n(t?.driverPrice ?? t?.DriverPrice);
+    const tripPrice=t=> n(t?.tripPrice ?? t?.TripPrice);
+    const remainingFund=t=> n(t?.tahseelRemaining ?? t?.TahseelRemaining ?? (custody(t)+totalTahseel(t)-totalPayments(t)));
+    const paidPocket=t=> n(t?.driverPaidFromPocket ?? t?.DriverPaidFromPocket ?? Math.max(0,totalPayments(t)-custody(t)-totalTahseel(t)));
+    const driverAccountAmount=t=> n(t?.driverAccountAmount ?? t?.DriverAccountAmount ?? (driverPrice(t)+paidPocket(t)-Math.max(0,remainingFund(t))));
+    function balanceBadge(t){const a=driverAccountAmount(t); const label=a>0?'للسائق':a<0?'على السائق':'متوازن'; const cls=a>0?'badge-success':a<0?'badge-danger':'badge-info'; return `<span class="badge ${cls}">${label}: ${money(Math.abs(a))}</span>`}
+    function isCompanyTrip(t){return t?.inSide===true||t?.InSide===true||t?.isCompany===true||t?.IsCompany===true}
+    function companyName(t){return (t?.companyName||t?.CompanyName||'').trim()}
+    function tripTypeBadge(t){return isCompanyTrip(t)?`<span class="badge badge-purple">شركة أخرى: ${esc(companyName(t)||'—')}</span>`:`<span class="badge badge-success">رحلات Go Bus</span>`}
+    function tripDate(t){return t?.tripDate||t?.TripDate}
+    function isDone(t){return t?.isDone===true||t?.IsDone===true}
+    function route(t){return `${esc(t?.fromLocation||t?.FromLocation||'')} ← ${esc(t?.toLocation||t?.ToLocation||'')}`}
+    function busName(t){return esc(t?.busName||t?.BusName||t?.bus?.name||'—')}
+    function driverName(t){return esc(t?.driverName||t?.DriverName||t?.driver?.name||'—')}
+    function notesOf(x){return esc(x?.notes||x?.Notes||'')}
+    function userName(x){return esc(x?.userName||x?.UserName||x?.createdByName||x?.CreatedByName||'—')}
+    function payId(p){return p.paymentId||p.PaymentId}
+    function tahId(x){return x.tahseelId||x.TahseelId}
+    function paymentRow(p, editable=false){return `<div class="item-row"><div><b>${money(p.amount??p.Amount)}</b><span class="muted"> - ${notesOf(p)||'بدون ملاحظات'} - بواسطة ${userName(p)}</span></div>${editable?`<div><button class="btn btn-outline btn-xs" onclick="openPay('${p.tripId||p.TripId}','${payId(p)}')">تعديل</button> <button class="btn btn-danger btn-xs" onclick="deletePayment('${payId(p)}')">حذف</button></div>`:''}</div>`}
+    function tahseelRow(x, editable=false){return `<div class="item-row tahseel-row"><div><b>${money(x.amount??x.Amount)}</b><span class="muted"> - ${notesOf(x)||'بدون ملاحظات'} - بواسطة ${userName(x)}</span></div>${editable?`<div><button class="btn btn-outline btn-xs" onclick="openTahseel('${x.tripId||x.TripId}','${tahId(x)}')">تعديل</button> <button class="btn btn-danger btn-xs" onclick="deleteTahseel('${tahId(x)}')">حذف</button></div>`:''}</div>`}
+    function moneyGrid(t){return `<div class="money-grid">
+      <div class="money-box"><span>عهدة</span><b>${money(custody(t))}</b></div>
+      <div class="money-box"><span>التحصيل</span><b>${money(totalTahseel(t))}</b></div>
+      <div class="money-box"><span>المصروفات</span><b>${money(totalPayments(t))}</b></div>
+      <div class="money-box"><span>سولار</span><b>${money(solar(t))}</b></div>
+      <div class="money-box"><span>المتبقي من العهدة/التحصيل</span><b>${money(Math.max(0,remainingFund(t)))}</b></div>
+      <div class="money-box"><span>دفع من جيبه</span><b>${money(paidPocket(t))}</b></div>
+      <div class="money-box"><span>حساب السائق</span><b>${balanceBadge(t)}</b></div>
+    </div>`}
+    function cardTahseelList(t){
+      const items = tahseelOf(t);
+      return `<div class="card-section tahseel-section"><div class="section-title">التحصيلات (${items.length})</div>${items.length ? items.map(x => tahseelRow(x, !isDone(t))).join('') : '<div class="empty-line">لا توجد تحصيلات حتى الآن</div>'}</div>`;
+    }
+    function cardPaymentsList(t){
+      const items = paymentsOf(t);
+      return `<div class="card-section payment-section"><div class="section-title">المصروفات (${items.length})</div>${items.length ? items.map(x => paymentRow(x, !isDone(t))).join('') : '<div class="empty-line">لا توجد مصروفات حتى الآن</div>'}</div>`;
+    }
+    async function loadBase(){const [b,d,tr]=await Promise.all([api.get('/management/buses'),api.get('/management/drivers'),api.get('/management/trips')]);return {buses:b?.data||[],drivers:d?.data||[],trips:tr?.data||[]}}
+    function options(list,idKey,nameKey,selected=''){return `<option value="">اختر</option>`+list.map(x=>`<option value="${x[idKey]}" ${x[idKey]===selected?'selected':''}>${esc(x[nameKey])}</option>`).join('')}
+    function filterByDate(list, value){return value?list.filter(t=>(tripDate(t)||'').slice(0,10)===value):list}
+    function setupStyle(){const st=document.createElement('style');st.textContent=`.money-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:12px 0}.money-box{border:1px solid var(--border);background:var(--bg);border-radius:10px;padding:10px 12px}.money-box span{display:block;font-size:12px;color:var(--text-muted);margin-bottom:5px}.money-box b{font-size:15px}.muted{color:var(--text-muted);font-size:12px}.item-row{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--border);background:var(--bg);border-radius:9px;padding:9px 12px;margin-bottom:7px;flex-wrap:wrap}.tahseel-row{border-right:4px solid var(--success);background:linear-gradient(90deg,rgba(22,163,74,.08),transparent),var(--bg)}.trip-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}.trip-card.locked-trip{border-right:5px solid var(--success);background:linear-gradient(90deg,rgba(22,163,74,.08),transparent),var(--bg-card)}.locked-note{border:1px solid rgba(22,163,74,.25);background:var(--success-light);color:var(--success);border-radius:10px;padding:9px 12px;margin-top:10px;font-size:13px;font-weight:700}.trip-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start}.card-section{border-top:1px solid var(--border);padding-top:12px;margin-top:12px}.section-title{font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px}.empty-line{border:1px dashed var(--border);border-radius:9px;padding:10px 12px;color:var(--text-muted);font-size:12px;background:var(--bg)}.line-row{display:grid;grid-template-columns:1fr 2fr auto;gap:8px;align-items:center;margin-bottom:8px}@media(max-width:760px){.line-row{grid-template-columns:1fr}.trip-head>div:last-child{display:flex;gap:6px;overflow-x:auto;width:100%;padding-bottom:4px}.trip-head .btn{flex:0 0 auto}}`;document.head.appendChild(st)}
+
+if(!requireAuth())throw'';document.getElementById('sidebarMount').innerHTML=buildSidebar('trips');setupStyle();let buses=[],drivers=[],trips=[];
+
+function openSolar(id){const t=trips.find(x=>x.tripId===id);if(!t)return;solarTripId.value=id;solarAmount.value=solar(t);solarTripInfo.textContent=`${route(t)} - الحالي: ${money(solar(t))}`;openModal('solarModal')}
+async function saveSolar(){const id=solarTripId.value;const res=await api.put(`/management/trips/${id}/solar`,{solar:n(solarAmount.value)});if(res?.success){toast('تم حفظ سعر السولار');closeModal('solarModal');await init()}else toast(res?.message||'فشل حفظ السولار','error')}
+
+async function init(){const x=await loadBase();buses=x.buses;drivers=x.drivers;trips=x.trips;fBusId.innerHTML=options(buses,'busId','name');fDriverId.innerHTML=options(drivers,'driverId','name');driverFilter.innerHTML='<option value="">كل السائقين</option>'+drivers.map(d=>`<option value="${d.driverId}">${esc(d.name)}</option>`).join('');render()}
+function render(){let list=[...trips];const q=document.getElementById('q').value.trim().toLowerCase(),df=dateFilter.value,dr=driverFilter.value,ow=ownerFilter.value;list=filterByDate(list,df).filter(t=>(!dr||t.driverId===dr)&&(!q||route(t).toLowerCase().includes(q)||driverName(t).toLowerCase().includes(q)||busName(t).toLowerCase().includes(q))&&(!ow||(ow==='mine'?!isCompanyTrip(t):isCompanyTrip(t))));tripsBox.innerHTML=list.length?list.map(t=>card(t,true)).join(''):'<div class="card">لا توجد رحلات</div>'}
+function canPermanentDeleteTrip(t){
+  return t?.canBePermanentlyDeleted === true || t?.CanBePermanentlyDeleted === true;
+}
+function permanentDeleteTitle(t){
+  const reason = t?.permanentDeleteReason || t?.PermanentDeleteReason || '';
+  return canPermanentDeleteTrip(t)
+    ? (reason || 'حذف الرحلة نهائياً بكل البيانات المرتبطة بها')
+    : (reason || 'لا يمكن حذف هذه الرحلة');
+}
+function permanentDeleteButton(t){
+  const id = t?.tripId || t?.TripId || '';
+  if (!id || !canPermanentDeleteTrip(t)) return '';
+  return `<button class="btn btn-danger btn-sm" title="${esc(permanentDeleteTitle(t))}" onclick="permanentDeleteTrip('${esc(id)}')">حذف الرحلة</button>`;
+}
+function card(t,editable){const done=isDone(t);const locked=done?'<span class="badge badge-success" style="margin-inline-start:6px">✓ تم الحساب - مغلقة</span>':'';const actions=editable?`${permanentDeleteButton(t)} <button class="btn btn-outline btn-sm" onclick="showDetail('${t.tripId}')">تفاصيل</button> ${done?'':`<button class="btn btn-outline btn-sm" onclick="openEdit('${t.tripId}')">تعديل</button> <button class="btn btn-primary btn-sm" onclick="openPay('${t.tripId}')">+ مصروف</button> <button class="btn btn-success btn-sm" onclick="openTahseel('${t.tripId}')">+ تحصيل</button>`} <button class="btn btn-outline btn-sm" onclick="openSolar('${t.tripId}')">⛽ سولار</button>`:'';return `<div class="trip-card ${done?'done locked-trip':''}"><div class="trip-head"><div><b>${route(t)}</b><div class="muted">${fmtDateTime(tripDate(t))} - السائق: ${driverName(t)} - الحافلة: ${busName(t)}</div><div style="margin-top:6px">${tripTypeBadge(t)} ${balanceBadge(t)} ${locked}</div></div><div>${actions}</div></div>${done?'<div class="locked-note">هذه الرحلة تم حسابها، لا يمكن تعديلها أو تعديل مصروفاتها/تحصيلاتها. المسموح فقط تعديل السولار.</div>':''}${moneyGrid(t)}${cardTahseelList(t)}${cardPaymentsList(t)}</div>`}
+function toggleCompany(){companyGroup.style.display=fIsCompany.value==='true'?'block':'none'}
+function clearForm(){editId.value='';fDate.value='';fFrom.value='';fTo.value='';fTripPrice.value='';fDriverPrice.value='';fCache.value='';fSolar.value='';fIsCompany.value='false';fCompanyName.value='';fNotes.value='';payLines.innerHTML='';tahLines.innerHTML='';toggleCompany()}
+function openCreate(){clearForm();formTitle.textContent='إضافة رحلة';openModal('formModal')}
+function openEdit(id){const t=trips.find(x=>x.tripId===id);if(!t)return;if(isDone(t)){toast('هذه الرحلة تم حسابها ولا يمكن تعديلها. المسموح فقط تعديل السولار','error');return;}clearForm();editId.value=id;formTitle.textContent='تعديل رحلة';fBusId.value=t.busId;fDriverId.value=t.driverId;fDate.value=(tripDate(t)||'').slice(0,16);fFrom.value=t.fromLocation||'';fTo.value=t.toLocation||'';fTripPrice.value=tripPrice(t);fDriverPrice.value=driverPrice(t);fCache.value=custody(t);fSolar.value=solar(t);fIsCompany.value=isCompanyTrip(t)?'true':'false';fCompanyName.value=companyName(t);fNotes.value=t.notes||'';toggleCompany();openModal('formModal')}
+function addPayLine(v={}){payLines.insertAdjacentHTML('beforeend',`<div class="line-row"><input type="number" class="payAmount" min="0" step="0.01" placeholder="المبلغ" value="${v.amount||''}"><input class="payNotes" placeholder="ملاحظات المصروف" value="${esc(v.notes||'')}"><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">حذف</button></div>`)}
+function addTahLine(v={}){tahLines.insertAdjacentHTML('beforeend',`<div class="line-row"><input type="number" class="tahAmount" min="0" step="0.01" placeholder="التحصيل" value="${v.amount||''}"><input class="tahNotes" placeholder="ملاحظات التحصيل" value="${esc(v.notes||'')}"><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">حذف</button></div>`)}
+async function saveTrip(){const body={busId:fBusId.value,driverId:fDriverId.value,tripDate:new Date(fDate.value).toISOString(),fromLocation:fFrom.value.trim(),toLocation:fTo.value.trim(),userId:uid(),cache:n(fCache.value),solar:n(fSolar.value),tripPrice:n(fTripPrice.value),driverPrice:n(fDriverPrice.value),notes:fNotes.value.trim(),inSide:fIsCompany.value==='true',isCompany:fIsCompany.value==='true',companyName:fIsCompany.value==='true'?fCompanyName.value.trim():'',payments:[...document.querySelectorAll('#payLines .line-row')].map(r=>({amount:n(r.querySelector('.payAmount').value),notes:r.querySelector('.payNotes').value,userId:uid(),paymentType:'Cache'})).filter(x=>x.amount>0),tahseelItems:[...document.querySelectorAll('#tahLines .line-row')].map(r=>({amount:n(r.querySelector('.tahAmount').value),notes:r.querySelector('.tahNotes').value,userId:uid()})).filter(x=>x.amount>0)};const id=editId.value;const res=id?await api.put(`/management/trips/${id}`,body):await api.post('/management/trips',body);if(res?.success){toast('تم الحفظ');closeModal('formModal');await init()}else toast(res?.message||'فشل الحفظ','error')}
+function showDetail(id){const t=trips.find(x=>x.tripId===id);if(!t)return;detailBody.innerHTML=`<h3>${route(t)}</h3><div style="margin:8px 0">${tripTypeBadge(t)} ${balanceBadge(t)}</div>${moneyGrid(t)}<div class="details-grid"><div class="detail-item"><label>سعر التشغيله</label><div class="detail-value">${money(tripPrice(t))}</div></div><div class="detail-item"><label>كومسيون السائق</label><div class="detail-value">${money(driverPrice(t))}</div></div><div class="detail-item"><label>عهدة</label><div class="detail-value">${money(custody(t))}</div></div><div class="detail-item"><label>سولار</label><div class="detail-value">${money(solar(t))}</div></div></div><h4>التحصيلات</h4>${tahseelOf(t).length?tahseelOf(t).map(x=>tahseelRow(x,!isDone(t))).join(''):'<div class="muted">لا يوجد تحصيل</div>'}<h4>المصروفات</h4>${paymentsOf(t).length?paymentsOf(t).map(p=>paymentRow(p,!isDone(t))).join(''):'<div class="muted">لا توجد مصروفات</div>'}`;openModal('detailModal')}
+function openPay(tripId,pid=''){const tt=trips.find(x=>x.tripId===tripId);if(isDone(tt)){toast('هذه الرحلة تم حسابها ولا يمكن تعديل المصروفات','error');return;}payTripId.value=tripId;payId.value=pid;const t=trips.find(x=>x.tripId===tripId);const p=paymentsOf(t).find(x=>payId(x)===pid);payTitle.textContent=pid?'تعديل مصروف':'إضافة مصروف';payAmount.value=p? n(p.amount??p.Amount):'';payNotes.value=p? (p.notes||p.Notes||''):'';openModal('payModal')}
+async function savePayment(){const body={amount:n(payAmount.value),notes:payNotes.value,userId:uid(),paymentType:'Cache'};const res=payId.value?await api.put(`/management/payments/${payId.value}`,body):await api.post(`/management/trips/${payTripId.value}/payments`,body);if(res?.success){toast('تم حفظ المصروف');closeModal('payModal');await init()}else toast(res?.message||'فشل حفظ المصروف','error')}
+async function permanentDeleteTrip(id){
+  const t = trips.find(x => x.tripId === id || x.TripId === id);
+  if (!t) { toast('الرحلة غير موجودة', 'error'); return; }
+  if (!canPermanentDeleteTrip(t)) { toast(permanentDeleteTitle(t), 'error'); return; }
+  const message = `سيتم حذف الرحلة نهائياً بكل المصروفات والتحصيلات المرتبطة بها.\n${route(t)}\nهل أنت متأكد؟`;
+  if (!confirm(message)) return;
+  const res = await api.delete(`/management/trips/${id}/permanent`);
+  if (res?.success) {
+    toast(res.message || 'تم حذف الرحلة نهائياً');
+    closeModal('detailModal');
+    await init();
+  } else {
+    toast(res?.message || 'فشل حذف الرحلة', 'error');
+  }
+}
+async function deletePayment(id){const tt=trips.find(t=>paymentsOf(t).some(p=>payId(p)===id));if(isDone(tt)){toast('هذه الرحلة تم حسابها ولا يمكن حذف المصروفات','error');return;}if(!confirm('حذف المصروف؟'))return;const res=await api.delete(`/management/payments/${id}`);if(res?.success){toast('تم الحذف');await init();closeModal('detailModal')}else toast(res?.message||'فشل الحذف','error')}
+function openTahseel(tripId,tid=''){const tt=trips.find(x=>x.tripId===tripId);if(isDone(tt)){toast('هذه الرحلة تم حسابها ولا يمكن تعديل التحصيلات','error');return;}tahTripId.value=tripId;tahId.value=tid;const t=trips.find(x=>x.tripId===tripId);const x=tahseelOf(t).find(z=>tahId(z)===tid);tahTitle.textContent=tid?'تعديل تحصيل':'إضافة تحصيل';tahAmount.value=x?n(x.amount??x.Amount):'';tahNotes.value=x?(x.notes||x.Notes||''):'';openModal('tahModal')}
+async function saveTahseel(){const body={amount:n(tahAmount.value),notes:tahNotes.value,userId:uid()};const res=tahId.value?await api.put(`/management/tahseel/${tahId.value}`,body):await api.post(`/management/trips/${tahTripId.value}/tahseel`,body);if(res?.success){toast('تم حفظ التحصيل');closeModal('tahModal');await init()}else toast(res?.message||'فشل حفظ التحصيل','error')}
+async function deleteTahseel(id){const tt=trips.find(t=>tahseelOf(t).some(x=>tahId(x)===id));if(isDone(tt)){toast('هذه الرحلة تم حسابها ولا يمكن حذف التحصيلات','error');return;}if(!confirm('حذف التحصيل؟'))return;const res=await api.delete(`/management/tahseel/${id}`);if(res?.success){toast('تم حذف التحصيل');await init();closeModal('detailModal')}else toast(res?.message||'فشل الحذف','error')}
+init();</script></body></html>
